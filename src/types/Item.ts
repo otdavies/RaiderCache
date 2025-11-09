@@ -1,0 +1,68 @@
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export type ItemCategory =
+  | 'material_basic'
+  | 'material_refined'
+  | 'material_topside'
+  | 'material_advanced'
+  | 'recyclable'
+  | 'nature'
+  | 'trinket'
+  | 'weapon'
+  | 'modification'
+  | 'ammunition'
+  | 'consumable'
+  | 'blueprint'
+  | 'quest_item'
+  | 'misc';
+
+export interface RecycleOutput {
+  itemId: string;
+  quantity: number;
+}
+
+export interface CraftRecipe {
+  itemId: string;
+  quantity: number;
+}
+
+export interface ItemEffect {
+  label: Record<string, string>; // language code -> label
+  value: string | number;
+}
+
+export interface Item {
+  id: string;
+  name: Record<string, string>; // language code -> name
+  description?: Record<string, string>;
+  type: string;
+  rarity: Rarity;
+  value: number; // Coin value
+  weightKg: number;
+  stackSize: number;
+  recyclesInto?: RecycleOutput[];
+  salvagesInto?: RecycleOutput[];
+  recipe?: CraftRecipe[];
+  craftBench?: string;
+  effects?: ItemEffect[];
+  foundIn?: string[];
+  imageFilename?: string;
+  updatedAt?: string;
+  tip?: Record<string, string>;
+  _note?: string;
+}
+
+export interface ItemWithDecision extends Item {
+  decision: RecycleDecision;
+  decisionReasons: string[];
+  decisionConfidence: number;
+}
+
+export type RecycleDecision = 'keep' | 'recycle' | 'sell' | 'situational';
+
+export interface DecisionReason {
+  decision: RecycleDecision;
+  confidence: number; // 0-100
+  reasons: string[];
+  dependencies?: string[]; // Quest/project/upgrade names
+}

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Arc Raiders Loot Decision Tool - Quickly determine what to keep, recycle, or sell">
+  <title>Arc Raiders Loot List - Keep, Recycle, or Sell Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Barlow+Semi+Condensed:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="container">
+        <h1 class="logo">
+          <span class="logo-text">ARC RAIDERS</span>
+          <span class="logo-subtitle">Loot Decision Tool</span>
+        </h1>
+        <div class="header-stats" id="stats"></div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="container">
+        <!-- Search and Filter Bar -->
+        <div class="controls">
+          <div class="search-bar">
+            <input
+              type="search"
+              id="search"
+              placeholder="Search items..."
+              class="search-input"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="filters" id="filters">
+            <div class="filter-group">
+              <label class="filter-label">Decision:</label>
+              <div class="filter-buttons" id="decision-filter"></div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Rarity:</label>
+              <div class="filter-buttons" id="rarity-filter"></div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Category:</label>
+              <select id="category-filter" class="filter-select">
+                <option value="">All Categories</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workshop Progress Tracker -->
+        <div class="workshop-tracker" id="workshop-tracker">
+          <h2 class="section-title">Your Hideout Progress</h2>
+          <div class="workshop-grid" id="workshop-grid"></div>
+        </div>
+
+        <!-- Quick Action Dashboard -->
+        <div class="decision-dashboard" id="dashboard">
+          <div class="dashboard-card keep">
+            <h3>Keep These</h3>
+            <p class="count" id="keep-count">0 items</p>
+          </div>
+          <div class="dashboard-card recycle">
+            <h3>Safe to Recycle</h3>
+            <p class="count" id="recycle-count">0 items</p>
+          </div>
+          <div class="dashboard-card sell">
+            <h3>Safe to Sell</h3>
+            <p class="count" id="sell-count">0 items</p>
+          </div>
+          <div class="dashboard-card situational">
+            <h3>Situational</h3>
+            <p class="count" id="situational-count">0 items</p>
+          </div>
+        </div>
+
+        <!-- Items Grid -->
+        <div class="items-section">
+          <div class="section-header">
+            <h2 class="section-title" id="items-title">All Items</h2>
+            <div class="view-toggle">
+              <button class="toggle-btn active" data-view="grid">Grid</button>
+              <button class="toggle-btn" data-view="list">List</button>
+            </div>
+          </div>
+          <div class="items-grid" id="items-grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <p>Data auto-updates daily from community sources • Not affiliated with Embark Studios</p>
+        <p class="update-info">Last updated: <span id="last-update">Loading...</span></p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Item Detail Modal -->
+  <div class="modal" id="item-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
