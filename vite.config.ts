@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/ArcRaidersLootList/',
+  base: '/RaiderCache/',
   build: {
     outDir: 'dist',
     sourcemap: true,
