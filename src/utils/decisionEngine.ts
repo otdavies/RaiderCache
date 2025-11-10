@@ -34,7 +34,7 @@ export class DecisionEngine {
       // Recycle tier I and II weapons
       if (tierNumber <= 2) {
         return {
-          decision: 'recycle',
+          decision: 'sell_or_recycle',
           confidence: 95,
           reasons: [
             `Tier ${tierNumber} weapon - upgrade to higher tiers`,
@@ -118,10 +118,10 @@ export class DecisionEngine {
       }
     }
 
-    // Priority 5: High value trinkets/items (SELL)
+    // Priority 5: High value trinkets/items (SELL OR RECYCLE)
     if (this.isHighValueTrinket(item)) {
       return {
-        decision: 'sell',
+        decision: 'sell_or_recycle',
         confidence: 95,
         reasons: [
           `High value (${item.value} coins)`,
@@ -130,12 +130,12 @@ export class DecisionEngine {
       };
     }
 
-    // Priority 6: Items that recycle into valuable materials (RECYCLE)
+    // Priority 6: Items that recycle into valuable materials (SELL OR RECYCLE)
     if (item.recyclesInto && item.recyclesInto.length > 0) {
       const recycleValue = this.evaluateRecycleValue(item);
       if (recycleValue.isValuable) {
         return {
-          decision: 'recycle',
+          decision: 'sell_or_recycle',
           confidence: 85,
           reasons: [
             `Recycles into: ${recycleValue.description}`,
@@ -157,11 +157,11 @@ export class DecisionEngine {
       };
     }
 
-    // Default: Safe to recycle
+    // Default: Safe to sell or recycle
     return {
-      decision: 'recycle',
+      decision: 'sell_or_recycle',
       confidence: 80,
-      reasons: ['No immediate use found', 'Safe to recycle']
+      reasons: ['No immediate use found', 'Safe to sell or recycle']
     };
   }
 
@@ -403,14 +403,12 @@ export class DecisionEngine {
    */
   getDecisionStats(userProgress: UserProgress): {
     keep: number;
-    recycle: number;
-    sell: number;
+    sell_or_recycle: number;
     situational: number;
   } {
     const stats = {
       keep: 0,
-      recycle: 0,
-      sell: 0,
+      sell_or_recycle: 0,
       situational: 0
     };
 

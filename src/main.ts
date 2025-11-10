@@ -107,13 +107,18 @@ class App {
     const filterContainer = document.getElementById('decision-filter');
     if (!filterContainer) return;
 
-    const decisions: RecycleDecision[] = ['keep', 'recycle', 'sell', 'situational'];
+    const decisions: RecycleDecision[] = ['keep', 'sell_or_recycle', 'situational'];
+    const labels: Record<RecycleDecision, string> = {
+      keep: 'Keep',
+      sell_or_recycle: 'Sell/Recycle',
+      situational: 'Review'
+    };
 
     decisions.forEach(decision => {
       const button = document.createElement('button');
       button.className = 'filter-btn';
       button.dataset.decision = decision;
-      button.textContent = decision.charAt(0).toUpperCase() + decision.slice(1);
+      button.textContent = labels[decision];
 
       button.addEventListener('click', () => {
         if (this.filters.decisions.has(decision)) {
@@ -226,7 +231,12 @@ class App {
     const workshopGrid = document.getElementById('workshop-grid');
     if (!workshopGrid) return;
 
-    this.gameData.hideoutModules.forEach(module => {
+    // Filter out utility_bench and stash as they're not relevant for this tool
+    const relevantModules = this.gameData.hideoutModules.filter(
+      module => module.id !== 'utility_bench' && module.id !== 'stash'
+    );
+
+    relevantModules.forEach(module => {
       const currentLevel = this.userProgress.hideoutLevels[module.id] || 1;
       const moduleName = module.name['en'] || module.name[Object.keys(module.name)[0]];
 
@@ -348,8 +358,7 @@ class App {
     const stats = this.decisionEngine.getDecisionStats(this.userProgress);
 
     this.updateStatElement('keep-count', stats.keep);
-    this.updateStatElement('recycle-count', stats.recycle);
-    this.updateStatElement('sell-count', stats.sell);
+    this.updateStatElement('sell-or-recycle-count', stats.sell_or_recycle);
     this.updateStatElement('situational-count', stats.situational);
   }
 

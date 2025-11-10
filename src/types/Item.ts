@@ -58,7 +58,7 @@ export interface ItemWithDecision extends Item {
   decisionConfidence: number;
 }
 
-export type RecycleDecision = 'keep' | 'recycle' | 'sell' | 'situational';
+export type RecycleDecision = 'keep' | 'sell_or_recycle' | 'situational';
 
 export interface DecisionReason {
   decision: RecycleDecision;

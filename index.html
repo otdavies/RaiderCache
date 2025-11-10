@@ -23,72 +23,74 @@
 
     <main class="main">
       <div class="container">
-        <!-- Search and Filter Bar -->
-        <div class="controls collapsible">
-          <h3 class="collapsible-header" data-target="search-content">
-            <span>Search & Filters</span>
-            <span class="collapse-icon">▼</span>
-          </h3>
-          <div class="collapsible-content" id="search-content">
-            <div class="search-bar">
-              <input
-                type="search"
-                id="search"
-                placeholder="Search items..."
-                class="search-input"
-                autocomplete="off"
-              />
+        <div class="layout-wrapper">
+          <!-- Sidebar with Workshop Progress -->
+          <aside class="sidebar">
+            <div class="workshop-tracker" id="workshop-tracker">
+              <h3 class="workshop-header">Hideout Progress</h3>
+              <div class="workshop-grid" id="workshop-grid"></div>
+            </div>
+          </aside>
+
+          <!-- Main Content Area -->
+          <div class="main-content">
+            <!-- Search and Filter Bar -->
+            <div class="controls collapsible">
+              <h3 class="collapsible-header" data-target="search-content">
+                <span>Search & Filters</span>
+                <span class="collapse-icon">▼</span>
+              </h3>
+              <div class="collapsible-content" id="search-content">
+                <div class="search-bar">
+                  <input
+                    type="search"
+                    id="search"
+                    placeholder="Search items..."
+                    class="search-input"
+                    autocomplete="off"
+                  />
+                </div>
+
+                <div class="filters" id="filters">
+                <div class="filter-group">
+                  <label class="filter-label">Decision:</label>
+                  <div class="filter-buttons" id="decision-filter"></div>
+                </div>
+
+                <div class="filter-group">
+                  <label class="filter-label">Rarity:</label>
+                  <div class="filter-buttons" id="rarity-filter"></div>
+                </div>
+
+                <div class="filter-group">
+                  <label class="filter-label">Category:</label>
+                  <select id="category-filter" class="filter-select">
+                    <option value="">All Categories</option>
+                  </select>
+                </div>
+
+                <div class="filter-group">
+                  <label class="filter-label">
+                    <input type="checkbox" id="group-weapons" checked />
+                    Group weapon tiers (show only highest)
+                  </label>
+                </div>
+              </div>
+            </div>
             </div>
 
-            <div class="filters" id="filters">
-            <div class="filter-group">
-              <label class="filter-label">Decision:</label>
-              <div class="filter-buttons" id="decision-filter"></div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">Rarity:</label>
-              <div class="filter-buttons" id="rarity-filter"></div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">Category:</label>
-              <select id="category-filter" class="filter-select">
-                <option value="">All Categories</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">
-                <input type="checkbox" id="group-weapons" checked />
-                Group weapon tiers (show only highest)
-              </label>
+            <!-- Items Grid -->
+            <div class="items-section">
+              <div class="section-header">
+                <h2 class="section-title" id="items-title">All Items</h2>
+                <div class="view-toggle">
+                  <button class="toggle-btn active" data-view="grid">Grid</button>
+                  <button class="toggle-btn" data-view="list">List</button>
+                </div>
+              </div>
+              <div class="items-grid" id="items-grid"></div>
             </div>
           </div>
-        </div>
-        </div>
-
-        <!-- Workshop Progress Tracker -->
-        <div class="workshop-tracker collapsible" id="workshop-tracker">
-          <h3 class="collapsible-header" data-target="workshop-content">
-            <span>Your Hideout Progress</span>
-            <span class="collapse-icon">▼</span>
-          </h3>
-          <div class="collapsible-content" id="workshop-content">
-            <div class="workshop-grid" id="workshop-grid"></div>
-          </div>
-        </div>
-
-        <!-- Items Grid -->
-        <div class="items-section">
-          <div class="section-header">
-            <h2 class="section-title" id="items-title">All Items</h2>
-            <div class="view-toggle">
-              <button class="toggle-btn active" data-view="grid">Grid</button>
-              <button class="toggle-btn" data-view="list">List</button>
-            </div>
-          </div>
-          <div class="items-grid" id="items-grid"></div>
         </div>
       </div>
     </main>

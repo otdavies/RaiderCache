@@ -167,8 +167,7 @@ export class ItemModal {
   private getDecisionLabel(decision: string): string {
     const labels: Record<string, string> = {
       keep: 'KEEP',
-      recycle: 'RECYCLE',
-      sell: 'SELL',
+      sell_or_recycle: 'SELL/RECYCLE',
       situational: 'REVIEW'
     };
     return labels[decision] || decision.toUpperCase();

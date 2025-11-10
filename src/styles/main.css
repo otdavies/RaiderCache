@@ -13,8 +13,7 @@
 
   /* Decision Colors */
   --color-keep: #4caf50;
-  --color-recycle: #2196f3;
-  --color-sell: #ffc107;
+  --color-sell-or-recycle: #ffc107;
   --color-situational: #9c27b0;
 
   /* Rarity Colors (matching in-game) */
@@ -334,19 +333,11 @@ body {
   box-shadow: 0 8px 24px rgba(76, 175, 80, 0.3);
 }
 
-.dashboard-card.recycle {
-  border-color: var(--color-recycle);
+.dashboard-card.sell_or_recycle {
+  border-color: var(--color-sell-or-recycle);
 }
 
-.dashboard-card.recycle:hover {
-  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.3);
-}
-
-.dashboard-card.sell {
-  border-color: var(--color-sell);
-}
-
-.dashboard-card.sell:hover {
+.dashboard-card.sell_or_recycle:hover {
   box-shadow: 0 8px 24px rgba(255, 193, 7, 0.3);
 }
 
@@ -373,15 +364,47 @@ body {
 }
 
 /* ========================================
-   Workshop Tracker
+   Layout Wrapper
+   ======================================== */
+
+.layout-wrapper {
+  display: flex;
+  gap: var(--spacing-xl);
+  align-items: flex-start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 80px;
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ========================================
+   Workshop Tracker (Sidebar)
    ======================================== */
 
 .workshop-tracker {
-  background: var(--color-bg-card);
+  background: linear-gradient(135deg, var(--color-bg-card) 0%, var(--color-bg-elevated) 100%);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-lg);
   box-shadow: var(--shadow-md);
+  border: 1px solid rgba(0, 188, 212, 0.2);
+}
+
+.workshop-header {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-accent-cyan);
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
 }
 
 .section-title {
@@ -394,64 +417,90 @@ body {
 }
 
 .workshop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-md);
 }
 
 .workshop-card {
-  background: var(--color-bg-dark);
-  border-radius: var(--radius-md);
+  background: rgba(10, 14, 26, 0.6);
+  border-radius: var(--radius-sm);
   padding: var(--spacing-md);
-  border: 2px solid var(--color-bg-elevated);
+  border: 1px solid var(--color-bg-elevated);
   transition: all var(--transition-base);
+  backdrop-filter: blur(4px);
 }
 
 .workshop-card:hover {
   border-color: var(--color-accent-cyan);
+  background: rgba(10, 14, 26, 0.8);
+  transform: translateX(2px);
 }
 
 .workshop-card h3 {
-  font-size: 0.875rem;
+  font-size: 0.7rem;
   font-weight: 600;
   margin-bottom: var(--spacing-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .workshop-card__level {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
+}
+
+.workshop-card__level span {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 .workshop-card__slider {
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
+  height: 4px;
+  border-radius: 2px;
   background: var(--color-bg-elevated);
   outline: none;
   -webkit-appearance: none;
+  cursor: pointer;
 }
 
 .workshop-card__slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--color-accent-cyan);
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(0, 188, 212, 0.5);
+  box-shadow: 0 0 8px rgba(0, 188, 212, 0.6);
+  transition: all var(--transition-fast);
+}
+
+.workshop-card__slider::-webkit-slider-thumb:hover {
+  width: 14px;
+  height: 14px;
+  box-shadow: 0 0 12px rgba(0, 188, 212, 0.8);
 }
 
 .workshop-card__slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--color-accent-cyan);
   cursor: pointer;
   border: none;
-  box-shadow: 0 0 8px rgba(0, 188, 212, 0.5);
+  box-shadow: 0 0 8px rgba(0, 188, 212, 0.6);
+  transition: all var(--transition-fast);
+}
+
+.workshop-card__slider::-moz-range-thumb:hover {
+  width: 14px;
+  height: 14px;
+  box-shadow: 0 0 12px rgba(0, 188, 212, 0.8);
 }
 
 /* ========================================
@@ -654,7 +703,7 @@ body {
 
 .item-card__favorite:hover,
 .item-card__favorite.active {
-  color: var(--color-sell);
+  color: var(--color-sell-or-recycle);
   transform: scale(1.2);
 }
 
@@ -720,7 +769,7 @@ body {
 }
 
 .coin-icon {
-  color: var(--color-sell);
+  color: var(--color-sell-or-recycle);
 }
 
 /* ========================================
@@ -746,16 +795,10 @@ body {
   border: 1px solid var(--color-keep);
 }
 
-.decision-badge--recycle {
-  background: rgba(33, 150, 243, 0.15);
-  color: var(--color-recycle);
-  border: 1px solid var(--color-recycle);
-}
-
-.decision-badge--sell {
+.decision-badge--sell_or_recycle {
   background: rgba(255, 193, 7, 0.15);
-  color: var(--color-sell);
-  border: 1px solid var(--color-sell);
+  color: var(--color-sell-or-recycle);
+  border: 1px solid var(--color-sell-or-recycle);
 }
 
 .decision-badge--situational {
@@ -999,8 +1042,7 @@ body {
 }
 
 .decision-analysis__decision.decision-keep { color: var(--color-keep); }
-.decision-analysis__decision.decision-recycle { color: var(--color-recycle); }
-.decision-analysis__decision.decision-sell { color: var(--color-sell); }
+.decision-analysis__decision.decision-sell_or_recycle { color: var(--color-sell-or-recycle); }
 .decision-analysis__decision.decision-situational { color: var(--color-situational); }
 
 .decision-analysis__reasons {
@@ -1147,6 +1189,33 @@ body {
    Responsive Design
    ======================================== */
 
+@media (max-width: 1024px) {
+  .layout-wrapper {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: relative;
+    top: 0;
+    width: 100%;
+    order: 1;
+  }
+
+  .main-content {
+    order: 2;
+  }
+
+  .workshop-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .workshop-card {
+    min-width: 140px;
+  }
+}
+
 @media (max-width: 768px) {
   .header .container {
     flex-direction: column;
@@ -1195,7 +1264,11 @@ body {
   }
 
   .workshop-grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .workshop-card {
+    min-width: auto;
   }
 
   .item-modal {

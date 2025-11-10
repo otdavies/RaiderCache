@@ -110,23 +110,21 @@ export class ItemCard {
   }
 
   private getDecisionIcon(decision: RecycleDecision): string {
-    const icons = {
+    const icons: Record<RecycleDecision, string> = {
       keep: '🛡️',
-      recycle: '♻️',
-      sell: '💰',
+      sell_or_recycle: '💰',
       situational: '❓'
     };
-    return icons[decision];
+    return icons[decision] || '❓';
   }
 
   private getDecisionLabel(decision: RecycleDecision): string {
-    const labels = {
+    const labels: Record<RecycleDecision, string> = {
       keep: 'KEEP',
-      recycle: 'RECYCLE',
-      sell: 'SELL',
+      sell_or_recycle: 'SELL/RECYCLE',
       situational: 'REVIEW'
     };
-    return labels[decision];
+    return labels[decision] || 'UNKNOWN';
   }
 
   destroy(): void {
