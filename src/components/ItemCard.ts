@@ -27,6 +27,7 @@ export class ItemCard {
     card.dataset.itemId = item.id;
 
     const iconUrl = dataLoader.getIconUrl(item);
+    const placeholderUrl = import.meta.env.BASE_URL + 'assets/icons/placeholder.png';
     const itemName = item.name['en'] || item.name[Object.keys(item.name)[0]];
 
     card.innerHTML = `
@@ -43,7 +44,7 @@ export class ItemCard {
           alt="${itemName}"
           class="item-card__image"
           loading="lazy"
-          onerror="this.src='/assets/icons/placeholder.png'"
+          onerror="this.src='${placeholderUrl}'"
         />
       </div>
 

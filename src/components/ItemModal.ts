@@ -49,6 +49,7 @@ export class ItemModal {
   private renderContent(): string {
     const { item, decisionData } = this.config;
     const iconUrl = dataLoader.getIconUrl(item);
+    const placeholderUrl = import.meta.env.BASE_URL + 'assets/icons/placeholder.png';
     const itemName = item.name['en'] || item.name[Object.keys(item.name)[0]];
     const description = item.description?.['en'] || item.description?.[Object.keys(item.description || {})[0]] || 'No description available';
 
@@ -62,7 +63,7 @@ export class ItemModal {
               src="${iconUrl}"
               alt="${itemName}"
               class="item-modal__image"
-              onerror="this.src='/assets/icons/placeholder.png'"
+              onerror="this.src='${placeholderUrl}'"
             />
           </div>
           <div class="item-modal__header-info">
