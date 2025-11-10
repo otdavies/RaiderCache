@@ -20,7 +20,7 @@
   --color-common: #9e9e9e;
   --color-uncommon: #4caf50;
   --color-rare: #2196f3;
-  --color-epic: #e91e63;
+  --color-epic: #9c27b0;
   --color-legendary: #ff9800;
 
   /* Accent Colors */
@@ -798,7 +798,6 @@ body {
 .item-card:hover {
   transform: translateY(-4px) scale(1.02);
   box-shadow: var(--shadow-lg);
-  border-color: var(--color-accent-cyan);
 }
 
 .item-card__header {
@@ -819,24 +818,65 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.item-card.rarity-common {
+  border-color: var(--color-common);
+}
+
 .item-card.rarity-common .item-card__rarity-badge {
   color: var(--color-common);
+}
+
+.item-card.rarity-uncommon {
+  border-color: var(--color-uncommon);
 }
 
 .item-card.rarity-uncommon .item-card__rarity-badge {
   color: var(--color-uncommon);
 }
 
+.item-card.rarity-rare {
+  border-color: var(--color-rare);
+}
+
 .item-card.rarity-rare .item-card__rarity-badge {
   color: var(--color-rare);
+}
+
+.item-card.rarity-epic {
+  border-color: var(--color-epic);
 }
 
 .item-card.rarity-epic .item-card__rarity-badge {
   color: var(--color-epic);
 }
 
+.item-card.rarity-legendary {
+  border-color: var(--color-legendary);
+}
+
 .item-card.rarity-legendary .item-card__rarity-badge {
   color: var(--color-legendary);
+}
+
+/* Rarity-specific hover effects with glowing shadows */
+.item-card.rarity-common:hover {
+  box-shadow: 0 8px 24px rgba(158, 158, 158, 0.4);
+}
+
+.item-card.rarity-uncommon:hover {
+  box-shadow: 0 8px 24px rgba(76, 175, 80, 0.5);
+}
+
+.item-card.rarity-rare:hover {
+  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.5);
+}
+
+.item-card.rarity-epic:hover {
+  box-shadow: 0 8px 24px rgba(156, 39, 176, 0.5);
+}
+
+.item-card.rarity-legendary:hover {
+  box-shadow: 0 8px 24px rgba(255, 152, 0, 0.6);
 }
 
 .item-card__favorite {
