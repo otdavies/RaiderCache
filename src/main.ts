@@ -294,9 +294,9 @@ class App {
     const workshopGrid = document.getElementById('workshop-grid');
     if (!workshopGrid) return;
 
-    // Filter out utility_bench, stash, and workbench as they're not relevant for this tool
+    // Filter out stash and workbench as they're not relevant for this tool
     const relevantModules = this.gameData.hideoutModules.filter(
-      module => module.id !== 'utility_bench' && module.id !== 'stash' && module.id !== 'workbench'
+      module => module.id !== 'stash' && module.id !== 'workbench'
     );
 
     relevantModules.forEach(module => {
