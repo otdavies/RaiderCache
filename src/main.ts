@@ -447,12 +447,6 @@ class App {
 
       this.itemsGrid.appendChild(itemCard.render());
     });
-
-    // Update title
-    const title = document.getElementById('items-title');
-    if (title) {
-      title.textContent = `Items (${this.filteredItems.length})`;
-    }
   }
 
   private showItemModal(item: Item) {
