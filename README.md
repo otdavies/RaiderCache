@@ -6,16 +6,6 @@ Interactive loot decision tool for Arc Raiders - quickly determine what to keep,
 ![Build Status](https://img.shields.io/github/actions/workflow/status/otdavies/RaiderCache/deploy.yml?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
-## 🎮 Features
-
-- **Smart Decision Engine** - Automatically determines if items should be kept, recycled, or sold
-- **Workshop Progress Tracker** - Track your hideout upgrades and get recommendations based on your progress
-- **Powerful Search & Filters** - Find items quickly with fuzzy search and advanced filtering
-- **Live Data Updates** - Automatically syncs with the latest game data daily
-- **Responsive Design** - Works perfectly on desktop and mobile
-- **Offline Support** - Works offline after first load
-- **Arc Raiders Aesthetic** - Styled to match the game's visual design
-
 ## 🚀 Quick Start
 
 Visit the live app: [https://otdavies.github.io/RaiderCache/](https://otdavies.github.io/RaiderCache/)
@@ -56,7 +46,7 @@ This tool uses community-maintained data from:
 
 ## 📖 How It Works
 
-### Decision Engine
+### Decisions
 
 The app analyzes each item based on:
 
