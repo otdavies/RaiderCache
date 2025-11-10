@@ -72,13 +72,13 @@ async function resizeImage(filePath: string): Promise<boolean> {
       return false;
     }
 
-    // Skip if already small (under 100px on either dimension)
-    if (metadata.width < 100 || metadata.height < 100) {
+    // Skip if already very small (under 50px on either dimension)
+    if (metadata.width < 50 || metadata.height < 50) {
       return true; // Already small enough
     }
 
-    const newWidth = Math.round(metadata.width / 4);
-    const newHeight = Math.round(metadata.height / 4);
+    const newWidth = Math.round(metadata.width / 2);
+    const newHeight = Math.round(metadata.height / 2);
 
     // Normalize and resize with multiple fallback strategies
     try {
@@ -330,7 +330,7 @@ async function main() {
 
     console.log(`✅ Downloaded ${downloadedIcons} new icons (${skippedIcons} already existed)`);
     if (resizedCount > 0) {
-      console.log(`📐 Resized ${resizedCount} icons to 25% of original size`);
+      console.log(`📐 Resized ${resizedCount} icons to 50% of original size`);
     }
     if (resizeFailedCount > 0) {
       console.log(`⚠️  ${resizeFailedCount} icons failed to resize (kept original)`);
