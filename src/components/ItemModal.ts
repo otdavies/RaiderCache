@@ -140,7 +140,7 @@ export class ItemModal {
               </div>
             ` : ''}
 
-            ${item.foundIn && item.foundIn.length > 0 ? `
+            ${Array.isArray(item.foundIn) && item.foundIn.length > 0 ? `
               <div class="item-modal__section">
                 <h3>Found In</h3>
                 <ul class="location-list">

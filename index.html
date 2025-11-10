@@ -24,18 +24,23 @@
     <main class="main">
       <div class="container">
         <!-- Search and Filter Bar -->
-        <div class="controls">
-          <div class="search-bar">
-            <input
-              type="search"
-              id="search"
-              placeholder="Search items..."
-              class="search-input"
-              autocomplete="off"
-            />
-          </div>
+        <div class="controls collapsible">
+          <h3 class="collapsible-header" data-target="search-content">
+            <span>Search & Filters</span>
+            <span class="collapse-icon">▼</span>
+          </h3>
+          <div class="collapsible-content" id="search-content">
+            <div class="search-bar">
+              <input
+                type="search"
+                id="search"
+                placeholder="Search items..."
+                class="search-input"
+                autocomplete="off"
+              />
+            </div>
 
-          <div class="filters" id="filters">
+            <div class="filters" id="filters">
             <div class="filter-group">
               <label class="filter-label">Decision:</label>
               <div class="filter-buttons" id="decision-filter"></div>
@@ -54,30 +59,16 @@
             </div>
           </div>
         </div>
-
-        <!-- Workshop Progress Tracker -->
-        <div class="workshop-tracker" id="workshop-tracker">
-          <h2 class="section-title">Your Hideout Progress</h2>
-          <div class="workshop-grid" id="workshop-grid"></div>
         </div>
 
-        <!-- Quick Action Dashboard -->
-        <div class="decision-dashboard" id="dashboard">
-          <div class="dashboard-card keep">
-            <h3>Keep These</h3>
-            <p class="count" id="keep-count">0 items</p>
-          </div>
-          <div class="dashboard-card recycle">
-            <h3>Safe to Recycle</h3>
-            <p class="count" id="recycle-count">0 items</p>
-          </div>
-          <div class="dashboard-card sell">
-            <h3>Safe to Sell</h3>
-            <p class="count" id="sell-count">0 items</p>
-          </div>
-          <div class="dashboard-card situational">
-            <h3>Situational</h3>
-            <p class="count" id="situational-count">0 items</p>
+        <!-- Workshop Progress Tracker -->
+        <div class="workshop-tracker collapsible" id="workshop-tracker">
+          <h3 class="collapsible-header" data-target="workshop-content">
+            <span>Your Hideout Progress</span>
+            <span class="collapse-icon">▼</span>
+          </h3>
+          <div class="collapsible-content" id="workshop-content">
+            <div class="workshop-grid" id="workshop-grid"></div>
           </div>
         </div>
 

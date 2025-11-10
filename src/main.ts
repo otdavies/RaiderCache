@@ -383,3 +383,17 @@ class App {
 // Initialize app
 const app = new App();
 app.init();
+
+// Collapsible sections functionality
+document.addEventListener('DOMContentLoaded', () => {
+  const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
+
+  collapsibleHeaders.forEach(header => {
+    header.addEventListener('click', () => {
+      const parent = header.closest('.collapsible');
+      if (parent) {
+        parent.classList.toggle('collapsed');
+      }
+    });
+  });
+});
