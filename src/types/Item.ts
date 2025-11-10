@@ -55,14 +55,12 @@ export interface Item {
 export interface ItemWithDecision extends Item {
   decision: RecycleDecision;
   decisionReasons: string[];
-  decisionConfidence: number;
 }
 
 export type RecycleDecision = 'keep' | 'sell_or_recycle' | 'situational';
 
 export interface DecisionReason {
   decision: RecycleDecision;
-  confidence: number; // 0-100
   reasons: string[];
   dependencies?: string[]; // Quest/project/upgrade names
 }

@@ -31,7 +31,6 @@ export class DecisionEngine {
     if (item.rarity?.toLowerCase() === 'legendary') {
       return {
         decision: 'keep',
-        confidence: 100,
         reasons: [
           'Legendary rarity - extremely valuable',
           'Keep all legendaries'
@@ -43,7 +42,6 @@ export class DecisionEngine {
     if (item.type === 'Blueprint') {
       return {
         decision: 'situational',
-        confidence: 100,
         reasons: [
           'Blueprint - valuable for unlocking crafting recipes',
           'Review carefully before selling or recycling'
@@ -55,7 +53,6 @@ export class DecisionEngine {
     if (item.type === 'Weapon' || WeaponGrouper.isWeaponVariant(item)) {
       return {
         decision: 'situational',
-        confidence: 90,
         reasons: [
           'Weapon - review based on your current loadout',
           'Consider tier and your play style'
@@ -67,7 +64,6 @@ export class DecisionEngine {
     if (item.type === 'Ammunition') {
       return {
         decision: 'situational',
-        confidence: 90,
         reasons: [
           'Ammunition - essential for weapons',
           'Review based on your weapon loadout'
@@ -79,7 +75,6 @@ export class DecisionEngine {
     if (item.type === 'Quick Use') {
       return {
         decision: 'situational',
-        confidence: 90,
         reasons: [
           'Consumable item - grenades, healing items, etc.',
           'Review based on your current inventory needs'
@@ -91,7 +86,6 @@ export class DecisionEngine {
     if (item.type === 'Key') {
       return {
         decision: 'situational',
-        confidence: 90,
         reasons: [
           'Key - opens locked areas and containers',
           'Review based on areas you want to access'
@@ -104,7 +98,6 @@ export class DecisionEngine {
     if (questUse.isUsed) {
       return {
         decision: 'keep',
-        confidence: 100,
         reasons: [`Required for quest: ${questUse.questNames.join(', ')}`],
         dependencies: questUse.questNames
       };
@@ -115,7 +108,6 @@ export class DecisionEngine {
     if (projectUse.isUsed) {
       return {
         decision: 'keep',
-        confidence: 95,
         reasons: [`Needed for project: ${projectUse.projectNames.join(', ')}`],
         dependencies: projectUse.projectNames
       };
@@ -126,7 +118,6 @@ export class DecisionEngine {
     if (upgradeUse.isNeeded) {
       return {
         decision: 'keep',
-        confidence: 90,
         reasons: [
           `Required for hideout upgrade: ${upgradeUse.moduleNames.join(', ')}`
         ],
@@ -140,7 +131,6 @@ export class DecisionEngine {
       if (craftingValue.isValuable) {
         return {
           decision: 'situational',
-          confidence: 70,
           reasons: [
             `Used in ${craftingValue.recipeCount} crafting recipes`,
             craftingValue.details
@@ -153,7 +143,6 @@ export class DecisionEngine {
     if (this.isHighValueTrinket(item)) {
       return {
         decision: 'sell_or_recycle',
-        confidence: 95,
         reasons: [
           `High value (${item.value} coins)`,
           'No crafting or upgrade use'
@@ -167,7 +156,6 @@ export class DecisionEngine {
       if (recycleValue.isValuable) {
         return {
           decision: 'sell_or_recycle',
-          confidence: 85,
           reasons: [
             `Recycles into: ${recycleValue.description}`,
             `Total value: ${recycleValue.estimatedValue} coins`
@@ -180,7 +168,6 @@ export class DecisionEngine {
     if (item.rarity && ['rare', 'epic'].includes(item.rarity.toLowerCase())) {
       return {
         decision: 'situational',
-        confidence: 60,
         reasons: [
           `${item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)} rarity`,
           'May have future use - review carefully'
@@ -191,7 +178,6 @@ export class DecisionEngine {
     // Default: Safe to sell or recycle
     return {
       decision: 'sell_or_recycle',
-      confidence: 80,
       reasons: ['No immediate use found', 'Safe to sell or recycle']
     };
   }

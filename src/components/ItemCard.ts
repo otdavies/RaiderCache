@@ -61,13 +61,6 @@ export class ItemCard {
           <span class="decision-badge__icon">${this.getDecisionIcon(decisionData.decision)}</span>
           <span class="decision-badge__text">${this.getDecisionLabel(decisionData.decision)}</span>
         </div>
-
-        <div class="item-card__confidence">
-          <div class="confidence-bar">
-            <div class="confidence-bar__fill" style="width: ${decisionData.confidence}%"></div>
-          </div>
-          <span class="confidence-label">${decisionData.confidence}% confidence</span>
-        </div>
       </div>
     `;
 

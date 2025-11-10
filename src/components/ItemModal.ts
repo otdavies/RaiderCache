@@ -92,7 +92,6 @@ export class ItemModal {
                 <span class="decision-analysis__decision decision-${decisionData.decision}">
                   ${this.getDecisionLabel(decisionData.decision)}
                 </span>
-                <span class="decision-analysis__confidence">${decisionData.confidence}% Confidence</span>
               </div>
               <ul class="decision-analysis__reasons">
                 ${decisionData.reasons.map(reason => `<li>${reason}</li>`).join('')}
