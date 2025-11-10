@@ -152,20 +152,27 @@ async function resizeImage(filePath: string): Promise<boolean> {
       return false;
     }
 
-    // Replace original with resized version - retry with delay if locked
-    let retries = 3;
-    while (retries > 0) {
-      try {
-        fs.unlinkSync(filePath);
-        fs.renameSync(tmpPath, filePath);
-        return true;
-      } catch (unlinkError: any) {
-        if (unlinkError.code === 'EBUSY' && retries > 1) {
-          // Wait a bit and retry
-          await new Promise(resolve => setTimeout(resolve, 100));
+    // Replace original with resized version - use copyFile + unlink to avoid locks
+    try {
+      // Copy the new file over the old one
+      fs.copyFileSync(tmpPath, filePath);
+      // Remove the temp file
+      fs.unlinkSync(tmpPath);
+      return true;
+    } catch (replaceError: any) {
+      // If copy failed, try with retries
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          fs.copyFileSync(tmpPath, filePath);
+          fs.unlinkSync(tmpPath);
+          return true;
+        } catch (retryError: any) {
           retries--;
-        } else {
-          throw unlinkError;
+          if (retries === 0) {
+            throw retryError;
+          }
         }
       }
     }
