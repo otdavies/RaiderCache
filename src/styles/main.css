@@ -298,6 +298,43 @@ body {
   border-color: var(--color-accent-cyan);
 }
 
+.sort-controls {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.sort-controls .filter-select {
+  flex: 1;
+}
+
+.sort-direction-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-bg-elevated);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  min-width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sort-direction-btn:hover {
+  background: var(--color-bg-card);
+  border-color: var(--color-accent-cyan);
+  transform: translateY(-1px);
+}
+
+.sort-direction-btn[data-direction="desc"] {
+  color: var(--color-accent-cyan);
+}
+
 /* ========================================
    Decision Dashboard
    ======================================== */

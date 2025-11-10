@@ -25,7 +25,8 @@ class App {
     rarities: new Set<string>(),
     category: '',
     groupWeapons: true,
-    sortBy: 'name' as 'name' | 'value' | 'rarity' | 'weight' | 'decision'
+    sortBy: 'name' as 'name' | 'value' | 'rarity' | 'weight' | 'decision',
+    sortDirection: 'asc' as 'asc' | 'desc'
   };
 
   constructor() {
@@ -112,7 +113,7 @@ class App {
     const decisions: RecycleDecision[] = ['keep', 'sell_or_recycle', 'situational'];
     const labels: Record<RecycleDecision, string> = {
       keep: 'Keep',
-      sell_or_recycle: 'Sell/Recycle',
+      sell_or_recycle: 'Safe to Sell',
       situational: 'Review'
     };
 
@@ -201,6 +202,27 @@ class App {
       this.filters.sortBy = (e.target as HTMLSelectElement).value as any;
       this.applyFilters();
     });
+
+    // Sort direction toggle
+    const directionBtn = document.getElementById('sort-direction-btn');
+    if (directionBtn) {
+      directionBtn.addEventListener('click', () => {
+        this.filters.sortDirection = this.filters.sortDirection === 'asc' ? 'desc' : 'asc';
+        this.updateSortDirectionButton();
+        this.applyFilters();
+      });
+      this.updateSortDirectionButton();
+    }
+  }
+
+  private updateSortDirectionButton() {
+    const btn = document.getElementById('sort-direction-btn');
+    if (!btn) return;
+
+    const isAsc = this.filters.sortDirection === 'asc';
+    btn.innerHTML = isAsc ? '↑' : '↓';
+    btn.title = isAsc ? 'Sort ascending' : 'Sort descending';
+    btn.setAttribute('data-direction', this.filters.sortDirection);
   }
 
   private initializeDashboard() {
@@ -345,33 +367,43 @@ class App {
   private sortItems(items: SearchableItem[]): SearchableItem[] {
     const rarityOrder = { legendary: 5, epic: 4, rare: 3, uncommon: 2, common: 1 };
     const decisionOrder = { keep: 3, situational: 2, sell_or_recycle: 1 };
+    const direction = this.filters.sortDirection === 'asc' ? 1 : -1;
 
     return [...items].sort((a, b) => {
+      let result = 0;
+
       switch (this.filters.sortBy) {
         case 'name':
           const nameA = a.name['en'] || Object.values(a.name)[0] || '';
           const nameB = b.name['en'] || Object.values(b.name)[0] || '';
-          return nameA.localeCompare(nameB);
+          result = nameA.localeCompare(nameB);
+          break;
 
         case 'value':
-          return (b.value || 0) - (a.value || 0); // Descending
+          result = (a.value || 0) - (b.value || 0);
+          break;
 
         case 'rarity':
-          const rarityA = rarityOrder[a.rarity as keyof typeof rarityOrder] || 0;
-          const rarityB = rarityOrder[b.rarity as keyof typeof rarityOrder] || 0;
-          return rarityB - rarityA; // Descending (legendary first)
+          const rarityA = rarityOrder[a.rarity?.toLowerCase() as keyof typeof rarityOrder] || 0;
+          const rarityB = rarityOrder[b.rarity?.toLowerCase() as keyof typeof rarityOrder] || 0;
+          result = rarityA - rarityB;
+          break;
 
         case 'weight':
-          return (a.weightKg || 0) - (b.weightKg || 0); // Ascending
+          result = (a.weightKg || 0) - (b.weightKg || 0);
+          break;
 
         case 'decision':
           const decisionA = decisionOrder[a.decisionData.decision as keyof typeof decisionOrder] || 0;
           const decisionB = decisionOrder[b.decisionData.decision as keyof typeof decisionOrder] || 0;
-          return decisionB - decisionA; // Descending (keep first)
+          result = decisionA - decisionB;
+          break;
 
         default:
-          return 0;
+          result = 0;
       }
+
+      return result * direction;
     });
   }
 

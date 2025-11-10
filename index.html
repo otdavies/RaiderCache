@@ -71,13 +71,16 @@
 
                 <div class="filter-group">
                   <label class="filter-label">Sort by:</label>
-                  <select id="sort-selector" class="filter-select">
-                    <option value="name">Name</option>
-                    <option value="value">Value (High to Low)</option>
-                    <option value="rarity">Rarity (Legendary First)</option>
-                    <option value="weight">Weight (Low to High)</option>
-                    <option value="decision">Decision (Keep First)</option>
-                  </select>
+                  <div class="sort-controls">
+                    <select id="sort-selector" class="filter-select">
+                      <option value="name">Name</option>
+                      <option value="value">Value</option>
+                      <option value="rarity">Rarity</option>
+                      <option value="weight">Weight</option>
+                      <option value="decision">Decision</option>
+                    </select>
+                    <button id="sort-direction-btn" class="sort-direction-btn" title="Sort ascending">↑</button>
+                  </div>
                 </div>
 
                 <div class="filter-group">
