@@ -12,7 +12,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "fuse.js": "^7.0.0"
+    "fuse.js": "^7.0.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

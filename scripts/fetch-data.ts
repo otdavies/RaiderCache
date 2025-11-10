@@ -1,11 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
+import * as sharp from 'sharp';
 
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/RaidTheory/arcraiders-data/main';
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const DATA_DIR = path.join(PUBLIC_DIR, 'data');
 const ICONS_DIR = path.join(PUBLIC_DIR, 'assets', 'icons');
+const RESIZED_MARKER = path.join(ICONS_DIR, '.resized');
 
 // Ensure directories exist
 [PUBLIC_DIR, DATA_DIR, ICONS_DIR].forEach(dir => {
@@ -48,6 +50,45 @@ function downloadFile(url: string, dest: string): Promise<void> {
       fs.unlink(dest, () => reject(err));
     });
   });
+}
+
+async function resizeImage(filePath: string): Promise<void> {
+  const image = sharp(filePath);
+  const metadata = await image.metadata();
+
+  if (!metadata.width || !metadata.height) {
+    throw new Error('Unable to read image dimensions');
+  }
+
+  const newWidth = Math.round(metadata.width / 4);
+  const newHeight = Math.round(metadata.height / 4);
+
+  await image
+    .resize(newWidth, newHeight, {
+      fit: 'fill',
+      kernel: 'lanczos3'
+    })
+    .toFile(filePath + '.tmp');
+
+  // Replace original with resized version
+  fs.unlinkSync(filePath);
+  fs.renameSync(filePath + '.tmp', filePath);
+}
+
+function loadResizedIcons(): Set<string> {
+  if (!fs.existsSync(RESIZED_MARKER)) {
+    return new Set();
+  }
+  try {
+    const data = fs.readFileSync(RESIZED_MARKER, 'utf-8');
+    return new Set(JSON.parse(data));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveResizedIcons(resizedIcons: Set<string>): void {
+  fs.writeFileSync(RESIZED_MARKER, JSON.stringify(Array.from(resizedIcons), null, 2));
 }
 
 async function fetchJSON<T>(url: string): Promise<T> {
@@ -122,9 +163,11 @@ async function main() {
   console.log('\n📥 Downloading item icons...');
   try {
     const itemsData = await fetchJSON<any[]>(`${GITHUB_RAW_BASE}/items.json`);
+    const resizedIcons = loadResizedIcons();
 
     let downloadedIcons = 0;
     let skippedIcons = 0;
+    let resizedCount = 0;
 
     for (const item of itemsData) {
       if (item.imageFilename) {
@@ -142,15 +185,21 @@ async function main() {
 
         const iconPath = path.join(ICONS_DIR, filename);
 
-        // Skip if already exists
-        if (fs.existsSync(iconPath)) {
-          skippedIcons++;
-          continue;
-        }
-
         try {
-          await downloadFile(iconUrl, iconPath);
-          downloadedIcons++;
+          // Download if doesn't exist
+          if (!fs.existsSync(iconPath)) {
+            await downloadFile(iconUrl, iconPath);
+            downloadedIcons++;
+          } else {
+            skippedIcons++;
+          }
+
+          // Resize if not already resized
+          if (!resizedIcons.has(filename)) {
+            await resizeImage(iconPath);
+            resizedIcons.add(filename);
+            resizedCount++;
+          }
 
           // Log progress every 10 icons
           if (downloadedIcons % 10 === 0) {
@@ -162,7 +211,13 @@ async function main() {
       }
     }
 
+    // Save resized icons tracking
+    saveResizedIcons(resizedIcons);
+
     console.log(`✅ Downloaded ${downloadedIcons} new icons (${skippedIcons} already existed)`);
+    if (resizedCount > 0) {
+      console.log(`📐 Resized ${resizedCount} icons to 25% of original size`);
+    }
   } catch (error) {
     console.error('❌ Failed to download icons:', error);
   }

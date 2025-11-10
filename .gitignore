@@ -41,4 +41,7 @@ lerna-debug.log*
 *.tmp
 *.temp
 
+# Icon resize tracking
+public/assets/icons/.resized
+
 claude.md
