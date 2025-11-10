@@ -69,26 +69,14 @@ export class ItemCard {
           <span class="confidence-label">${decisionData.confidence}% confidence</span>
         </div>
       </div>
-
-      <div class="item-card__footer">
-        <button class="item-card__details-btn" data-action="details">
-          View Details
-        </button>
-      </div>
     `;
 
     // Event listeners
     const favoriteBtn = card.querySelector('[data-action="favorite"]');
-    const detailsBtn = card.querySelector('[data-action="details"]');
 
     favoriteBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleFavorite();
-    });
-
-    detailsBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.config.onClick(item);
     });
 
     card.addEventListener('click', () => {

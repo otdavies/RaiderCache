@@ -54,6 +54,7 @@ function downloadFile(url: string, dest: string): Promise<void> {
 
 async function resizeImage(filePath: string): Promise<boolean> {
   const tmpPath = filePath + '.tmp';
+  const TARGET_SIZE = 128;
 
   try {
     // Check if file is accessible first
@@ -72,13 +73,16 @@ async function resizeImage(filePath: string): Promise<boolean> {
       return false;
     }
 
-    // Skip if already very small (under 50px on either dimension)
-    if (metadata.width < 50 || metadata.height < 50) {
-      return true; // Already small enough
+    // Check if already the correct size and format
+    if (metadata.width === TARGET_SIZE &&
+        metadata.height === TARGET_SIZE &&
+        metadata.format === 'png') {
+      return true; // Already correct, skip processing
     }
 
-    const newWidth = Math.round(metadata.width / 2);
-    const newHeight = Math.round(metadata.height / 2);
+    // Always resize TO target size (not divide by 2!)
+    const newWidth = TARGET_SIZE;
+    const newHeight = TARGET_SIZE;
 
     // Normalize and resize with multiple fallback strategies
     try {
@@ -337,7 +341,7 @@ async function main() {
 
     console.log(`✅ Downloaded ${downloadedIcons} new icons (${skippedIcons} already existed)`);
     if (resizedCount > 0) {
-      console.log(`📐 Resized ${resizedCount} icons to 50% of original size`);
+      console.log(`📐 Resized ${resizedCount} icons to 128x128 PNG format`);
     }
     if (resizeFailedCount > 0) {
       console.log(`⚠️  ${resizeFailedCount} icons failed to resize (kept original)`);
