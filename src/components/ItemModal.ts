@@ -107,9 +107,7 @@ export class ItemModal {
                   ${this.getDecisionLabel(decisionData.decision)}
                 </span>
               </div>
-              <ul class="decision-analysis__reasons">
-                ${decisionData.reasons.map(reason => `<li>${reason}</li>`).join('')}
-              </ul>
+              ${this.renderDecisionReasons(decisionData)}
               ${decisionData.dependencies && decisionData.dependencies.length > 0 ? `
                 <div class="decision-analysis__dependencies">
                   <strong>Required for:</strong> ${decisionData.dependencies.join(', ')}
@@ -218,6 +216,34 @@ export class ItemModal {
       situational: 'REVIEW'
     };
     return labels[decision] || decision.toUpperCase();
+  }
+
+  private renderDecisionReasons(decisionData: DecisionReason): string {
+    let reasons = decisionData.reasons;
+
+    // If dependencies exist, filter out dependency-related reasons to avoid duplication
+    if (decisionData.dependencies && decisionData.dependencies.length > 0) {
+      const dependencyPrefixes = [
+        'Required for quest:',
+        'Needed for project:',
+        'Required for hideout upgrade:'
+      ];
+
+      reasons = reasons.filter(reason => {
+        return !dependencyPrefixes.some(prefix => reason.startsWith(prefix));
+      });
+    }
+
+    // If we have reasons left, render them
+    if (reasons.length > 0) {
+      return `
+        <ul class="decision-analysis__reasons">
+          ${reasons.map(reason => `<li>${reason}</li>`).join('')}
+        </ul>
+      `;
+    }
+
+    return '';
   }
 
   private renderRecyclesInto(item: Item): string {
