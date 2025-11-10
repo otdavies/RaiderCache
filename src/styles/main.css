@@ -790,7 +790,7 @@ body {
   overflow: hidden;
   cursor: pointer;
   transition: all var(--transition-base);
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   box-shadow: var(--shadow-sm);
   animation: fadeInUp var(--transition-base);
 }
@@ -819,7 +819,7 @@ body {
 }
 
 .item-card.rarity-common {
-  border-color: var(--color-common);
+  border-color: rgba(158, 158, 158, 0.4);
 }
 
 .item-card.rarity-common .item-card__rarity-badge {
@@ -827,7 +827,7 @@ body {
 }
 
 .item-card.rarity-uncommon {
-  border-color: var(--color-uncommon);
+  border-color: rgba(76, 175, 80, 0.5);
 }
 
 .item-card.rarity-uncommon .item-card__rarity-badge {
@@ -835,7 +835,7 @@ body {
 }
 
 .item-card.rarity-rare {
-  border-color: var(--color-rare);
+  border-color: rgba(33, 150, 243, 0.5);
 }
 
 .item-card.rarity-rare .item-card__rarity-badge {
@@ -843,7 +843,7 @@ body {
 }
 
 .item-card.rarity-epic {
-  border-color: var(--color-epic);
+  border-color: rgba(156, 39, 176, 0.5);
 }
 
 .item-card.rarity-epic .item-card__rarity-badge {
@@ -851,7 +851,7 @@ body {
 }
 
 .item-card.rarity-legendary {
-  border-color: var(--color-legendary);
+  border-color: rgba(255, 152, 0, 0.6);
 }
 
 .item-card.rarity-legendary .item-card__rarity-badge {
@@ -860,23 +860,28 @@ body {
 
 /* Rarity-specific hover effects with glowing shadows */
 .item-card.rarity-common:hover {
-  box-shadow: 0 8px 24px rgba(158, 158, 158, 0.4);
+  border-color: rgba(158, 158, 158, 0.7);
+  box-shadow: 0 8px 24px rgba(158, 158, 158, 0.3);
 }
 
 .item-card.rarity-uncommon:hover {
-  box-shadow: 0 8px 24px rgba(76, 175, 80, 0.5);
+  border-color: rgba(76, 175, 80, 0.8);
+  box-shadow: 0 8px 24px rgba(76, 175, 80, 0.35);
 }
 
 .item-card.rarity-rare:hover {
-  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.5);
+  border-color: rgba(33, 150, 243, 0.8);
+  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.4);
 }
 
 .item-card.rarity-epic:hover {
-  box-shadow: 0 8px 24px rgba(156, 39, 176, 0.5);
+  border-color: rgba(156, 39, 176, 0.8);
+  box-shadow: 0 8px 24px rgba(156, 39, 176, 0.4);
 }
 
 .item-card.rarity-legendary:hover {
-  box-shadow: 0 8px 24px rgba(255, 152, 0, 0.6);
+  border-color: rgba(255, 152, 0, 0.9);
+  box-shadow: 0 8px 24px rgba(255, 152, 0, 0.45);
 }
 
 .item-card__favorite {
