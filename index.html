@@ -13,11 +13,35 @@
   <div id="app">
     <header class="header">
       <div class="container">
-        <h1 class="logo">
-          <span class="logo-text">ARC RAIDERS</span>
-          <span class="logo-subtitle">Loot Decision Tool</span>
-        </h1>
-        <div class="header-stats" id="stats"></div>
+        <div class="header-layout">
+          <div class="header-left">
+            <h1 class="logo">
+              <span class="logo-text">ARC RAIDERS</span>
+              <span class="logo-subtitle">Loot Decision Tool</span>
+            </h1>
+          </div>
+          <div class="header-right">
+            <div class="header-search">
+              <input
+                type="search"
+                id="search"
+                placeholder="Search items..."
+                class="search-input-header"
+                autocomplete="off"
+              />
+            </div>
+            <div class="header-sort">
+              <select id="sort-selector" class="sort-select">
+                <option value="name">Name</option>
+                <option value="value">Value</option>
+                <option value="rarity">Rarity</option>
+                <option value="weight">Weight</option>
+                <option value="decision">Decision</option>
+              </select>
+              <button id="sort-direction-btn" class="sort-direction-btn" title="Sort ascending">↑</button>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -70,32 +94,6 @@
 
           <!-- Main Content Area -->
           <div class="main-content">
-            <!-- Search and Sort Toolbar -->
-            <div class="toolbar">
-              <div class="toolbar-left">
-                <div class="sort-toolbar">
-                  <select id="sort-selector" class="sort-select">
-                    <option value="name">Name</option>
-                    <option value="value">Value</option>
-                    <option value="rarity">Rarity</option>
-                    <option value="weight">Weight</option>
-                    <option value="decision">Decision</option>
-                  </select>
-                  <button id="sort-direction-btn" class="sort-direction-btn" title="Sort ascending">↑</button>
-                </div>
-              </div>
-
-              <div class="toolbar-right">
-                <input
-                  type="search"
-                  id="search"
-                  placeholder="Search items..."
-                  class="search-input-main"
-                  autocomplete="off"
-                />
-              </div>
-            </div>
-
             <!-- Items Grid -->
             <div class="items-section">
               <div class="section-header">

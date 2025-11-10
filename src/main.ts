@@ -243,6 +243,18 @@ class App {
 
   private initializeViewToggle() {
     const toggleBtns = document.querySelectorAll('.toggle-btn');
+    const isMobile = window.innerWidth <= 768;
+
+    // Set default view based on screen size
+    if (isMobile) {
+      this.itemsGrid.classList.add('list-view');
+      toggleBtns.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-view') === 'list') {
+          btn.classList.add('active');
+        }
+      });
+    }
 
     toggleBtns.forEach(btn => {
       btn.addEventListener('click', (e) => {
