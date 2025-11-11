@@ -27,7 +27,7 @@ export class ItemCard {
     card.dataset.itemId = item.id;
 
     const iconUrl = dataLoader.getIconUrl(item);
-    const itemName = item.name?.['en'] || item.name?.[Object.keys(item.name || {})[0]] || '[Unknown Item]';
+    const itemName = item.name || '[Unknown Item]';
     const itemValue = item.value ?? 0;
     const stackSize = item.stackSize ?? 1;
 

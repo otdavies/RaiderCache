@@ -95,10 +95,12 @@ async function convertWebPToPNG(webpUrl: string, outputPath: string): Promise<bo
     // Download WebP
     await downloadFile(webpUrl, tmpWebP);
 
-    // Convert to PNG with resize
+    // Convert to PNG with resize (maintain aspect ratio, min height 128)
     await sharp(tmpWebP)
-      .resize(128, 128, {
-        fit: 'fill',
+      .resize({
+        height: 128,
+        fit: 'inside',
+        withoutEnlargement: false,
         kernel: 'lanczos3'
       })
       .png({

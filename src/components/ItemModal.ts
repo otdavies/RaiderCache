@@ -64,8 +64,8 @@ export class ItemModal {
   private renderContent(): string {
     const { item, decisionData } = this.config;
     const iconUrl = dataLoader.getIconUrl(item);
-    const itemName = item.name?.['en'] || item.name?.[Object.keys(item.name || {})[0]] || '[Unknown Item]';
-    const description = item.description?.['en'] || item.description?.[Object.keys(item.description || {})[0]] || 'No description available.';
+    const itemName = item.name || '[Unknown Item]';
+    const description = item.description || 'No description available.';
     const itemValue = item.value ?? 0;
     const itemWeight = item.weightKg ?? 0;
     const itemStack = item.stackSize ?? 1;
@@ -158,10 +158,10 @@ export class ItemModal {
             ` : ''}
           </div>
 
-          ${item.tip?.['en'] ? `
+          ${item.tip ? `
             <div class="item-modal__section item-modal__tip">
               <h3>💡 Tip</h3>
-              <p>${item.tip['en']}</p>
+              <p>${item.tip}</p>
             </div>
           ` : ''}
         </div>
@@ -264,7 +264,7 @@ export class ItemModal {
       .map(([itemId, quantity]) => {
         const outputItem = this.findItemByIdSimple(itemId);
         const iconUrl = outputItem ? dataLoader.getIconUrl(outputItem) : '';
-        const itemName = outputItem?.name?.['en'] || itemId;
+        const itemName = outputItem?.name || itemId;
         const rarity = (outputItem?.rarity || 'common').toLowerCase();
 
         return `
@@ -302,7 +302,7 @@ export class ItemModal {
         .map(([ingredientId, quantity]) => {
           const ingredientItem = this.findItemByIdSimple(ingredientId);
           const iconUrl = ingredientItem ? dataLoader.getIconUrl(ingredientItem) : '';
-          const itemName = ingredientItem?.name?.['en'] || ingredientId;
+          const itemName = ingredientItem?.name || ingredientId;
           const rarity = (ingredientItem?.rarity || 'common').toLowerCase();
 
           return `
@@ -333,7 +333,7 @@ export class ItemModal {
         .map(([ingredientId, quantity]) => {
           const ingredientItem = this.findItemByIdSimple(ingredientId);
           const iconUrl = ingredientItem ? dataLoader.getIconUrl(ingredientItem) : '';
-          const itemName = ingredientItem?.name?.['en'] || ingredientId;
+          const itemName = ingredientItem?.name || ingredientId;
           const rarity = (ingredientItem?.rarity || 'common').toLowerCase();
 
           return `
@@ -387,7 +387,7 @@ export class ItemModal {
 
     const itemsList = usedInItems
       .map(craftableItem => {
-        const name = craftableItem.name?.['en'] || craftableItem.name?.[Object.keys(craftableItem.name || {})[0]] || craftableItem.id;
+        const name = craftableItem.name || craftableItem.id;
         const quantity = craftableItem.recipe?.[item.id] || 0;
         const iconUrl = dataLoader.getIconUrl(craftableItem);
         const rarity = (craftableItem.rarity || 'common').toLowerCase();
