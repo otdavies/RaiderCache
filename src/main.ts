@@ -301,7 +301,7 @@ class App {
 
     relevantModules.forEach(module => {
       const currentLevel = this.userProgress.hideoutLevels[module.id] ?? 0;
-      const moduleName = module.name['en'] || module.name[Object.keys(module.name)[0]];
+      const moduleName = module.name;
 
       const getLevelText = (level: number) => {
         return level === 0 ? 'Not Unlocked' : `Level ${level} / ${module.maxLevel}`;
@@ -435,8 +435,8 @@ class App {
 
       switch (this.filters.sortBy) {
         case 'name':
-          const nameA = a.name['en'] || Object.values(a.name)[0] || '';
-          const nameB = b.name['en'] || Object.values(b.name)[0] || '';
+          const nameA = a.name || '';
+          const nameB = b.name || '';
           result = nameA.localeCompare(nameB);
           break;
 

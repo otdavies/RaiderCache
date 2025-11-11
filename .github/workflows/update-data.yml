@@ -43,11 +43,11 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add public/data public/assets/icons
-          git commit -m "🤖 Auto-update: Game data updated $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git commit -m "🤖 Auto-update: Game data updated"
           git push
 
       - name: Create changelog
         if: steps.git-check.outputs.changed == 'true'
         run: |
           echo "Game data was updated on $(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "Source: RaidTheory/arcraiders-data" >> $GITHUB_STEP_SUMMARY
+          echo "Source: MetaForge API (metaforge.app/arc-raiders)" >> $GITHUB_STEP_SUMMARY

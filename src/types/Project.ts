@@ -5,14 +5,14 @@ export interface ProjectRequirement {
 
 export interface ProjectPhase {
   phase: number;
-  name?: Record<string, string>;
+  name?: string; // English only (previously multilingual)
   requirementItemIds?: ProjectRequirement[];
 }
 
 export interface Project {
   id: string;
-  name: Record<string, string>;
-  description?: Record<string, string>;
+  name: string; // English only (previously multilingual)
+  description?: string; // English only (previously multilingual)
   requirements?: ProjectRequirement[];  // Legacy format
   phases?: ProjectPhase[];  // Actual format from data
   unlocks?: string[];

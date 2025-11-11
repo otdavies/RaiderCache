@@ -17,14 +17,14 @@ export type ItemCategory =
   | 'misc';
 
 export interface ItemEffect {
-  label: Record<string, string>; // language code -> label
+  label: string; // English only (previously multilingual)
   value: string | number;
 }
 
 export interface Item {
   id: string;
-  name: Record<string, string>; // language code -> name
-  description?: Record<string, string>;
+  name: string; // English only (previously multilingual)
+  description?: string; // English only (previously multilingual)
   type: string;
   rarity?: Rarity;  // Optional - not all items have rarity in API data
   value: number; // Coin value
@@ -40,7 +40,7 @@ export interface Item {
   foundIn?: string[];
   imageFilename?: string;
   updatedAt?: string;
-  tip?: Record<string, string>;
+  tip?: string; // English only (previously multilingual)
   _note?: string;
 }
 

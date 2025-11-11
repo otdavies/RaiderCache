@@ -14,8 +14,8 @@ export interface QuestReward {
 
 export interface Quest {
   id: string;
-  name: Record<string, string>;
-  description?: Record<string, string>;
+  name: string; // English only (previously multilingual)
+  description?: string; // English only (previously multilingual)
   requirements?: QuestRequirement[];
   rewards?: QuestReward[];
   rewardItemIds?: Array<{itemId: string; quantity: number}>;

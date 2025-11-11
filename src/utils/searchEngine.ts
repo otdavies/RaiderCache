@@ -12,8 +12,8 @@ export class SearchEngine {
   constructor(items: SearchableItem[]) {
     this.fuse = new Fuse(items, {
       keys: [
-        { name: 'name.en', weight: 2 },
-        { name: 'description.en', weight: 1 },
+        { name: 'name', weight: 2 }, // Now just 'name' (English only)
+        { name: 'description', weight: 1 }, // Now just 'description' (English only)
         { name: 'type', weight: 1.5 },
         { name: 'id', weight: 0.5 }
       ],

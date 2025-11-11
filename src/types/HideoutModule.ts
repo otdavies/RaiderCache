@@ -12,12 +12,12 @@ export interface WorkshopLevel {
   level: number;
   requirementItemIds: WorkshopRequirement[];
   otherRequirements?: OtherRequirement[];
-  description?: Record<string, string>;
+  description?: string; // English only (previously multilingual)
 }
 
 export interface HideoutModule {
   id: string;
-  name: Record<string, string>; // language code -> name
+  name: string; // English only (previously multilingual)
   maxLevel: number;
   levels: WorkshopLevel[];
 }

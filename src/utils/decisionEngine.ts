@@ -242,7 +242,7 @@ export class DecisionEngine {
       }
 
       if (isRequired) {
-        questNames.push(quest.name['en'] || quest.name[Object.keys(quest.name)[0]]);
+        questNames.push(quest.name);
       }
     }
 
@@ -289,7 +289,7 @@ export class DecisionEngine {
       }
 
       if (isRequired) {
-        projectNames.push(project.name['en'] || project.name[Object.keys(project.name)[0]]);
+        projectNames.push(project.name);
       }
     }
 
@@ -337,8 +337,7 @@ export class DecisionEngine {
         );
 
         if (isRequired) {
-          const moduleName = module.name['en'] || module.name[Object.keys(module.name)[0]];
-          moduleNames.push(`${moduleName} (Level ${levelData.level})`);
+          moduleNames.push(`${module.name} (Level ${levelData.level})`);
         }
       }
     }
@@ -424,10 +423,10 @@ export class DecisionEngine {
   }
 
   /**
-   * Get item name in English (or first available language)
+   * Get item name
    */
   private getItemName(item: Item): string {
-    return item.name['en'] || item.name[Object.keys(item.name)[0]];
+    return item.name;
   }
 
   /**

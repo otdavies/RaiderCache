@@ -3,23 +3,60 @@ import * as path from 'path';
 import * as https from 'https';
 import sharp from 'sharp';
 
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/RaidTheory/arcraiders-data/main';
+const METAFORGE_API_BASE = 'https://metaforge.app/api/arc-raiders';
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const DATA_DIR = path.join(PUBLIC_DIR, 'data');
+const STATIC_DATA_DIR = path.join(DATA_DIR, 'static');
 const ICONS_DIR = path.join(PUBLIC_DIR, 'assets', 'icons');
 const RESIZED_MARKER = path.join(ICONS_DIR, '.resized');
 
 // Ensure directories exist
-[PUBLIC_DIR, DATA_DIR, ICONS_DIR].forEach(dir => {
+[PUBLIC_DIR, DATA_DIR, STATIC_DATA_DIR, ICONS_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
-interface DownloadTask {
-  url: string;
-  dest: string;
-  description: string;
+interface MetaForgeItem {
+  id: string;
+  name: string;
+  description?: string;
+  item_type: string;
+  rarity: string;
+  value: number;
+  stat_block: {
+    weight?: number;
+    stackSize?: number;
+    [key: string]: any;
+  };
+  icon?: string;
+  loot_area?: string | null;
+  workbench?: string;
+  updated_at?: string;
+  [key: string]: any;
+}
+
+interface MetaForgeQuest {
+  id: string;
+  name: string;
+  objectives?: string[];
+  required_items?: any[];
+  rewards?: any;
+  trader?: string;
+  xp?: number;
+  [key: string]: any;
+}
+
+interface MetaForgePaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
 }
 
 function downloadFile(url: string, dest: string): Promise<void> {
@@ -27,7 +64,6 @@ function downloadFile(url: string, dest: string): Promise<void> {
     const file = fs.createWriteStream(dest);
     https.get(url, (response) => {
       if (response.statusCode === 302 || response.statusCode === 301) {
-        // Handle redirects
         if (response.headers.location) {
           downloadFile(response.headers.location, dest).then(resolve).catch(reject);
         } else {
@@ -52,145 +88,47 @@ function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
-async function resizeImage(filePath: string): Promise<boolean> {
-  const tmpPath = filePath + '.tmp';
-  const TARGET_SIZE = 128;
+async function convertWebPToPNG(webpUrl: string, outputPath: string): Promise<boolean> {
+  const tmpWebP = outputPath + '.tmp.webp';
 
   try {
-    // Check if file is accessible first
-    try {
-      fs.accessSync(filePath, fs.constants.R_OK | fs.constants.W_OK);
-    } catch (accessError) {
-      console.warn(`  ⚠️  Cannot access file ${path.basename(filePath)} - may be git-LFS placeholder`);
+    // Download WebP
+    await downloadFile(webpUrl, tmpWebP);
+
+    // Convert to PNG with resize
+    await sharp(tmpWebP)
+      .resize(128, 128, {
+        fit: 'fill',
+        kernel: 'lanczos3'
+      })
+      .png({
+        compressionLevel: 9,
+        adaptiveFiltering: true
+      })
+      .toColorspace('srgb')
+      .toFile(outputPath);
+
+    // Clean up temp file
+    fs.unlinkSync(tmpWebP);
+
+    // Verify the output
+    const metadata = await sharp(outputPath).metadata();
+    if (!metadata.width || !metadata.height || metadata.format !== 'png') {
+      console.warn(`  ⚠️  Invalid PNG output for ${path.basename(outputPath)}`);
       return false;
     }
 
-    // Read the original image
-    const metadata = await sharp(filePath).metadata();
-
-    if (!metadata.width || !metadata.height) {
-      console.warn(`  ⚠️  Cannot read dimensions for ${path.basename(filePath)}`);
-      return false;
-    }
-
-    // Check if already the correct size and format
-    if (metadata.width === TARGET_SIZE &&
-        metadata.height === TARGET_SIZE &&
-        metadata.format === 'png') {
-      return true; // Already correct, skip processing
-    }
-
-    // Always resize TO target size (not divide by 2!)
-    const newWidth = TARGET_SIZE;
-    const newHeight = TARGET_SIZE;
-
-    // Normalize and resize with multiple fallback strategies
-    try {
-      // Strategy 1: High-quality resize with format normalization
-      await sharp(filePath)
-        .resize(newWidth, newHeight, {
-          fit: 'fill',
-          kernel: 'lanczos3'
-        })
-        .png({
-          compressionLevel: 9,
-          adaptiveFiltering: true,
-          palette: false // Use full color
-        })
-        .toColorspace('srgb') // Normalize colorspace
-        .withMetadata({ // Strip most metadata but keep orientation
-          orientation: metadata.orientation
-        })
-        .toFile(tmpPath);
-    } catch (resizeError) {
-      // Strategy 2: Simpler settings if advanced fails
-      try {
-        await sharp(filePath)
-          .resize(newWidth, newHeight, {
-            fit: 'inside'
-          })
-          .png()
-          .toColorspace('srgb')
-          .toFile(tmpPath);
-      } catch (fallbackError) {
-        // Strategy 3: Most basic conversion - just normalize format
-        try {
-          await sharp(filePath)
-            .png()
-            .toColorspace('srgb')
-            .toFile(tmpPath);
-          console.warn(`  ⚠️  Could not resize ${path.basename(filePath)}, normalized format only`);
-        } catch (finalError) {
-          console.warn(`  ⚠️  All strategies failed for ${path.basename(filePath)}`);
-          return false;
-        }
-      }
-    }
-
-    // Verify the resized image is valid
-    const resizedStats = fs.statSync(tmpPath);
-    if (resizedStats.size === 0) {
-      fs.unlinkSync(tmpPath);
-      console.warn(`  ⚠️  Resized image is empty: ${path.basename(filePath)}`);
-      return false;
-    }
-
-    // Verify we can read the resized image
-    try {
-      const verifyMetadata = await sharp(tmpPath).metadata();
-      if (!verifyMetadata.width || !verifyMetadata.height) {
-        fs.unlinkSync(tmpPath);
-        console.warn(`  ⚠️  Resized image is invalid: ${path.basename(filePath)}`);
-        return false;
-      }
-
-      // Verify it's PNG format
-      if (verifyMetadata.format !== 'png') {
-        fs.unlinkSync(tmpPath);
-        console.warn(`  ⚠️  Image not converted to PNG: ${path.basename(filePath)}`);
-        return false;
-      }
-    } catch (verifyError) {
-      fs.unlinkSync(tmpPath);
-      console.warn(`  ⚠️  Resized image verification failed: ${path.basename(filePath)}`);
-      return false;
-    }
-
-    // Replace original with resized version - use copyFile + unlink to avoid locks
-    try {
-      // Copy the new file over the old one
-      fs.copyFileSync(tmpPath, filePath);
-      // Remove the temp file
-      fs.unlinkSync(tmpPath);
-      return true;
-    } catch (replaceError: any) {
-      // If copy failed, try with retries
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 200));
-          fs.copyFileSync(tmpPath, filePath);
-          fs.unlinkSync(tmpPath);
-          return true;
-        } catch (retryError: any) {
-          retries--;
-          if (retries === 0) {
-            throw retryError;
-          }
-        }
-      }
-    }
-
-    return false;
-
+    return true;
   } catch (error) {
-    // Clean up tmp file if it exists
-    if (fs.existsSync(tmpPath)) {
+    console.warn(`  ⚠️  WebP conversion failed for ${path.basename(outputPath)}: ${error}`);
+
+    // Clean up any temp files
+    if (fs.existsSync(tmpWebP)) {
       try {
-        fs.unlinkSync(tmpPath);
+        fs.unlinkSync(tmpWebP);
       } catch {}
     }
-    console.warn(`  ⚠️  Resize error for ${path.basename(filePath)}: ${error}`);
+
     return false;
   }
 }
@@ -242,119 +180,189 @@ async function fetchJSON<T>(url: string): Promise<T> {
   });
 }
 
-async function main() {
-  console.log('🚀 Fetching Arc Raiders data from RaidTheory GitHub...\n');
+async function fetchAllItems(): Promise<MetaForgeItem[]> {
+  console.log('📥 Fetching items from MetaForge API (with pagination)...');
 
-  const tasks: DownloadTask[] = [
-    {
-      url: `${GITHUB_RAW_BASE}/items.json`,
-      dest: path.join(DATA_DIR, 'items.json'),
-      description: 'Items database'
-    },
-    {
-      url: `${GITHUB_RAW_BASE}/hideoutModules.json`,
-      dest: path.join(DATA_DIR, 'hideoutModules.json'),
-      description: 'Hideout modules'
-    },
-    {
-      url: `${GITHUB_RAW_BASE}/quests.json`,
-      dest: path.join(DATA_DIR, 'quests.json'),
-      description: 'Quests'
-    },
-    {
-      url: `${GITHUB_RAW_BASE}/projects.json`,
-      dest: path.join(DATA_DIR, 'projects.json'),
-      description: 'Projects'
-    }
-  ];
+  const allItems: MetaForgeItem[] = [];
+  let currentPage = 1;
+  let hasNextPage = true;
+  const limit = 100; // Fetch 100 items per page
 
-  // Download JSON files
-  for (const task of tasks) {
+  while (hasNextPage) {
     try {
-      console.log(`📥 Downloading ${task.description}...`);
-      await downloadFile(task.url, task.dest);
-      console.log(`✅ ${task.description} downloaded successfully`);
+      const url = `${METAFORGE_API_BASE}/items?page=${currentPage}&limit=${limit}`;
+      console.log(`  Fetching page ${currentPage}...`);
+
+      const response = await fetchJSON<MetaForgePaginatedResponse<MetaForgeItem>>(url);
+      allItems.push(...response.data);
+
+      hasNextPage = response.pagination.hasNextPage;
+      currentPage++;
+
+      console.log(`  ✅ Page ${currentPage - 1}: ${response.data.length} items (Total so far: ${allItems.length}/${response.pagination.total})`);
+
+      // Rate limiting: wait 500ms between requests to be respectful
+      if (hasNextPage) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     } catch (error) {
-      console.error(`❌ Failed to download ${task.description}:`, error);
+      console.error(`  ❌ Failed to fetch page ${currentPage}:`, error);
+      hasNextPage = false;
     }
   }
 
-  // Download icons
-  console.log('\n📥 Downloading item icons...');
-  try {
-    const itemsData = await fetchJSON<any[]>(`${GITHUB_RAW_BASE}/items.json`);
-    const resizedIcons = loadResizedIcons();
+  console.log(`✅ Total items fetched: ${allItems.length}`);
+  return allItems;
+}
 
-    let downloadedIcons = 0;
-    let skippedIcons = 0;
-    let resizedCount = 0;
-    let resizeFailedCount = 0;
+async function fetchAllQuests(): Promise<MetaForgeQuest[]> {
+  console.log('📥 Fetching quests from MetaForge API...');
 
-    for (const item of itemsData) {
-      if (item.imageFilename) {
-        let iconUrl: string;
-        let filename: string;
+  const allQuests: MetaForgeQuest[] = [];
+  let currentPage = 1;
+  let hasNextPage = true;
+  const limit = 100;
 
-        // Handle both URL and relative path formats
-        if (item.imageFilename.startsWith('http')) {
-          iconUrl = item.imageFilename;
-          filename = path.basename(new URL(item.imageFilename).pathname);
+  while (hasNextPage) {
+    try {
+      const url = `${METAFORGE_API_BASE}/quests?page=${currentPage}&limit=${limit}`;
+      const response = await fetchJSON<MetaForgePaginatedResponse<MetaForgeQuest>>(url);
+      allQuests.push(...response.data);
+
+      hasNextPage = response.pagination.hasNextPage;
+      currentPage++;
+
+      console.log(`  ✅ Page ${currentPage - 1}: ${response.data.length} quests (Total so far: ${allQuests.length})`);
+
+      if (hasNextPage) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    } catch (error) {
+      console.error(`  ❌ Failed to fetch quests page ${currentPage}:`, error);
+      hasNextPage = false;
+    }
+  }
+
+  console.log(`✅ Total quests fetched: ${allQuests.length}`);
+  return allQuests;
+}
+
+function mapMetaForgeItemToOurFormat(metaforgeItem: MetaForgeItem): any {
+  // Map MetaForge item structure to our Item interface
+  return {
+    id: metaforgeItem.id,
+    name: metaforgeItem.name, // Now just a string (English only)
+    description: metaforgeItem.description || '',
+    type: metaforgeItem.item_type || 'Unknown',
+    rarity: metaforgeItem.rarity ? metaforgeItem.rarity.toLowerCase() : 'common',
+    value: metaforgeItem.value || 0,
+    weightKg: metaforgeItem.stat_block?.weight || 0,
+    stackSize: metaforgeItem.stat_block?.stackSize || 1,
+    imageFilename: metaforgeItem.id + '.png', // We'll convert WebP to PNG
+    foundIn: metaforgeItem.loot_area ? [metaforgeItem.loot_area] : [],
+    craftBench: metaforgeItem.workbench || undefined,
+    updatedAt: metaforgeItem.updated_at || new Date().toISOString(),
+    // Note: MetaForge doesn't provide recipe, recyclesInto, upgradeCost, etc.
+    // These fields will be missing unless we supplement from another source
+  };
+}
+
+function mapMetaForgeQuestToOurFormat(metaforgeQuest: MetaForgeQuest): any {
+  return {
+    id: metaforgeQuest.id,
+    name: metaforgeQuest.name,
+    objectives: metaforgeQuest.objectives || [],
+    requirements: metaforgeQuest.required_items || [],
+    rewards: metaforgeQuest.rewards || {},
+    trader: metaforgeQuest.trader,
+    xp: metaforgeQuest.xp || 0,
+  };
+}
+
+async function main() {
+  console.log('🚀 Fetching Arc Raiders data from MetaForge API...\n');
+
+  // Fetch items from MetaForge
+  const metaforgeItems = await fetchAllItems();
+  const mappedItems = metaforgeItems.map(mapMetaForgeItemToOurFormat);
+
+  // Save items.json
+  console.log('\n💾 Saving items.json...');
+  fs.writeFileSync(
+    path.join(DATA_DIR, 'items.json'),
+    JSON.stringify(mappedItems, null, 2)
+  );
+  console.log(`✅ Saved ${mappedItems.length} items to items.json`);
+
+  // Fetch quests from MetaForge
+  const metaforgeQuests = await fetchAllQuests();
+  const mappedQuests = metaforgeQuests.map(mapMetaForgeQuestToOurFormat);
+
+  // Save quests.json
+  console.log('\n💾 Saving quests.json...');
+  fs.writeFileSync(
+    path.join(DATA_DIR, 'quests.json'),
+    JSON.stringify(mappedQuests, null, 2)
+  );
+  console.log(`✅ Saved ${mappedQuests.length} quests to quests.json`);
+
+  // Download and convert icons
+  console.log('\n📥 Downloading and converting item icons from WebP to PNG...');
+  const resizedIcons = loadResizedIcons();
+
+  let downloadedIcons = 0;
+  let skippedIcons = 0;
+  let conversionFailedCount = 0;
+
+  for (const item of metaforgeItems) {
+    if (item.icon) {
+      const filename = item.id + '.png';
+      const iconPath = path.join(ICONS_DIR, filename);
+
+      try {
+        // Skip if already exists and processed
+        if (fs.existsSync(iconPath) && resizedIcons.has(filename)) {
+          skippedIcons++;
+          continue;
+        }
+
+        // Convert WebP to PNG
+        const success = await convertWebPToPNG(item.icon, iconPath);
+        if (success) {
+          resizedIcons.add(filename);
+          downloadedIcons++;
+
+          // Log progress every 20 icons
+          if (downloadedIcons % 20 === 0) {
+            console.log(`  Converted ${downloadedIcons} icons...`);
+          }
         } else {
-          iconUrl = `${GITHUB_RAW_BASE}/images/items/${item.imageFilename}`;
-          filename = item.imageFilename;
+          conversionFailedCount++;
         }
 
-        const iconPath = path.join(ICONS_DIR, filename);
-
-        try {
-          // Download if doesn't exist
-          if (!fs.existsSync(iconPath)) {
-            await downloadFile(iconUrl, iconPath);
-            downloadedIcons++;
-          } else {
-            skippedIcons++;
-          }
-
-          // Resize if not already resized
-          if (!resizedIcons.has(filename) && fs.existsSync(iconPath)) {
-            const resizeSuccess = await resizeImage(iconPath);
-            if (resizeSuccess) {
-              resizedIcons.add(filename);
-              resizedCount++;
-            } else {
-              resizeFailedCount++;
-            }
-          }
-
-          // Log progress every 10 icons
-          if (downloadedIcons % 10 === 0) {
-            console.log(`  Downloaded ${downloadedIcons} icons...`);
-          }
-        } catch (error) {
-          console.warn(`  ⚠️  Failed to download icon: ${filename}`);
-        }
+      } catch (error) {
+        console.warn(`  ⚠️  Failed to process icon: ${filename}`);
+        conversionFailedCount++;
       }
     }
+  }
 
-    // Save resized icons tracking
-    saveResizedIcons(resizedIcons);
+  // Save resized icons tracking
+  saveResizedIcons(resizedIcons);
 
-    console.log(`✅ Downloaded ${downloadedIcons} new icons (${skippedIcons} already existed)`);
-    if (resizedCount > 0) {
-      console.log(`📐 Resized ${resizedCount} icons to 128x128 PNG format`);
-    }
-    if (resizeFailedCount > 0) {
-      console.log(`⚠️  ${resizeFailedCount} icons failed to resize (kept original)`);
-    }
-  } catch (error) {
-    console.error('❌ Failed to download icons:', error);
+  console.log(`✅ Converted ${downloadedIcons} new icons (${skippedIcons} already existed)`);
+  if (conversionFailedCount > 0) {
+    console.log(`⚠️  ${conversionFailedCount} icons failed to convert (will use fallback)`);
   }
 
   // Create metadata file
   const metadata = {
     lastUpdated: new Date().toISOString(),
-    source: 'https://github.com/RaidTheory/arcraiders-data',
-    version: '1.0.0'
+    source: 'https://metaforge.app/arc-raiders (items & quests)',
+    staticSource: 'Local static files (hideout modules & projects)',
+    version: '2.0.0',
+    itemCount: mappedItems.length,
+    questCount: mappedQuests.length
   };
 
   fs.writeFileSync(
@@ -364,6 +372,9 @@ async function main() {
 
   console.log('\n✨ Data fetch complete!');
   console.log(`📊 Last updated: ${metadata.lastUpdated}`);
+  console.log(`📦 Total items: ${metadata.itemCount}`);
+  console.log(`🎯 Total quests: ${metadata.questCount}`);
+  console.log(`\n⚠️  Note: Hideout modules and projects are stored in public/data/static/ and are not updated by this script.`);
 }
 
 main().catch(console.error);

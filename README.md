@@ -31,9 +31,10 @@ npm run preview
 
 ## 📊 Data Sources
 
-This tool uses community-maintained data from:
-- [RaidTheory/arcraiders-data](https://github.com/RaidTheory/arcraiders-data) - Primary data source
-- Icons and item data are auto-updated daily via GitHub Actions
+This tool uses data from multiple sources:
+- **[MetaForge API](https://metaforge.app/arc-raiders)** - Primary live data source for items, quests, and icons
+- **Local Static Files** - Hideout modules and projects (updated manually as needed)
+- Item data and icons are auto-updated daily via GitHub Actions
 
 ## 🛠️ Tech Stack
 
@@ -60,7 +61,8 @@ The app analyzes each item based on:
 ### Automated Updates
 
 - Data automatically syncs daily at 6 AM UTC
-- GitHub Actions workflow fetches latest data from RaidTheory
+- GitHub Actions workflow fetches latest data from MetaForge API
+- WebP icons are converted to PNG format (128x128)
 - Validates data integrity before deployment
 - Automatically rebuilds and redeploys the app
 
@@ -92,18 +94,19 @@ All Arc Raiders game content © Embark Studios AB.
 ## 🙏 Credits
 
 ### Data & Icons
-- **Primary Data Source**: [RaidTheory/arcraiders-data](https://github.com/RaidTheory/arcraiders-data)
-  - Comprehensive item, quest, hideout, and project data
-  - AI-upscaled item icons from in-game screenshots
-  - Community-maintained with regular updates
+- **Primary Data Source**: [MetaForge API](https://metaforge.app/arc-raiders)
+  - Comprehensive item and quest data with frequent updates
+  - High-quality WebP icons (converted to PNG for compatibility)
+  - Active community-maintained API
+- **Static Data**: Hideout modules and projects maintained locally
 
 ### Additional Resources
 - **Game Content**: All Arc Raiders game content © [Embark Studios AB](https://www.embark-studios.com/)
 - **Official Game**: [Arc Raiders](https://arcraiders.com)
-- **Community APIs**: [MetaForge](https://metaforge.app/arc-raiders) for supplementary data
+- **Attribution**: Data provided by [metaforge.app](https://metaforge.app) - check out their tooltips and API!
 
 ### Special Thanks
-- RaidTheory team for maintaining the open-source data repository
+- MetaForge team for maintaining the community API and comprehensive game database
 - Arc Raiders community for ongoing support and contributions
 - Embark Studios for creating Arc Raiders
 

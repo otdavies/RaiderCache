@@ -62,7 +62,7 @@ export class WeaponGrouper {
       if (!this.isWeaponVariant(item)) continue;
 
       const baseId = this.getBaseId(item.id);
-      const baseName = this.getBaseName(item.name['en'] || Object.values(item.name)[0]);
+      const baseName = this.getBaseName(item.name);
       const tierNumber = this.getTierNumber(item.id);
 
       if (!groups.has(baseId)) {
