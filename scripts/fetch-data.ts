@@ -4,6 +4,12 @@ import * as https from 'https';
 import sharp from 'sharp';
 
 const METAFORGE_API_BASE = 'https://metaforge.app/api/arc-raiders';
+const SUPABASE_URL = 'https://unhbvkszwhczbjxgetgk.supabase.co/rest/v1';
+// MetaForge's public Supabase anonymous key - this is intentionally public and client-accessible
+// It's visible in their website source code and designed for read-only public API access
+// If they rotate this key, we'll need to extract the new one from https://metaforge.app
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVuaGJ2a3N6d2hjemJqeGdldGdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NjgwMjUsImV4cCI6MjA2MDU0NDAyNX0.gckCmxnlpwwJOGmc5ebLYDnaWaxr5PW31eCrSPR5aRQ';
+
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const DATA_DIR = path.join(PUBLIC_DIR, 'data');
 const STATIC_DATA_DIR = path.join(DATA_DIR, 'static');
@@ -57,6 +63,15 @@ interface MetaForgePaginatedResponse<T> {
     hasNextPage: boolean;
     hasPrevPage: boolean;
   };
+}
+
+interface SupabaseComponent {
+  id: string;
+  item_id: string;
+  component_id: string;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
 }
 
 function downloadFile(url: string, dest: string): Promise<void> {
@@ -182,6 +197,37 @@ async function fetchJSON<T>(url: string): Promise<T> {
   });
 }
 
+async function fetchSupabase<T>(table: string, params: string = ''): Promise<T> {
+  const url = `${SUPABASE_URL}/${table}${params ? '?' + params : ''}`;
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    };
+
+    https.get(url, options, (response) => {
+      let data = '';
+
+      if (response.statusCode !== 200) {
+        reject(new Error(`Supabase HTTP ${response.statusCode}`));
+        return;
+      }
+
+      response.on('data', chunk => data += chunk);
+      response.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
 async function fetchAllItems(): Promise<MetaForgeItem[]> {
   console.log('📥 Fetching items from MetaForge API (with pagination)...');
 
@@ -249,7 +295,59 @@ async function fetchAllQuests(): Promise<MetaForgeQuest[]> {
   return allQuests;
 }
 
-function mapMetaForgeItemToOurFormat(metaforgeItem: MetaForgeItem): any {
+async function fetchAllCraftingComponents(): Promise<Map<string, Record<string, number>>> {
+  console.log('📥 Fetching crafting recipes from MetaForge Supabase...');
+
+  try {
+    const components = await fetchSupabase<SupabaseComponent[]>('arc_item_components', 'select=*');
+
+    // Group by item_id
+    const craftingMap = new Map<string, Record<string, number>>();
+
+    for (const component of components) {
+      if (!craftingMap.has(component.item_id)) {
+        craftingMap.set(component.item_id, {});
+      }
+      craftingMap.get(component.item_id)![component.component_id] = component.quantity;
+    }
+
+    console.log(`✅ Loaded crafting recipes for ${craftingMap.size} items`);
+    return craftingMap;
+  } catch (error) {
+    console.warn(`⚠️  Failed to fetch crafting components: ${error}`);
+    return new Map();
+  }
+}
+
+async function fetchAllRecycleComponents(): Promise<Map<string, Record<string, number>>> {
+  console.log('📥 Fetching recycle data from MetaForge Supabase...');
+
+  try {
+    const components = await fetchSupabase<SupabaseComponent[]>('arc_item_recycle_components', 'select=*');
+
+    // Group by item_id
+    const recycleMap = new Map<string, Record<string, number>>();
+
+    for (const component of components) {
+      if (!recycleMap.has(component.item_id)) {
+        recycleMap.set(component.item_id, {});
+      }
+      recycleMap.get(component.item_id)![component.component_id] = component.quantity;
+    }
+
+    console.log(`✅ Loaded recycle data for ${recycleMap.size} items`);
+    return recycleMap;
+  } catch (error) {
+    console.warn(`⚠️  Failed to fetch recycle components: ${error}`);
+    return new Map();
+  }
+}
+
+function mapMetaForgeItemToOurFormat(
+  metaforgeItem: MetaForgeItem,
+  craftingMap: Map<string, Record<string, number>>,
+  recycleMap: Map<string, Record<string, number>>
+): any {
   // Map MetaForge item structure to our Item interface
   return {
     id: metaforgeItem.id,
@@ -261,11 +359,14 @@ function mapMetaForgeItemToOurFormat(metaforgeItem: MetaForgeItem): any {
     weightKg: metaforgeItem.stat_block?.weight || 0,
     stackSize: metaforgeItem.stat_block?.stackSize || 1,
     imageFilename: metaforgeItem.id + '.png', // We'll convert WebP to PNG
-    foundIn: metaforgeItem.loot_area ? [metaforgeItem.loot_area] : [],
+    foundIn: metaforgeItem.loot_area
+      ? metaforgeItem.loot_area.split(',').map(s => s.trim()).filter(s => s)
+      : [],
     craftBench: metaforgeItem.workbench || undefined,
     updatedAt: metaforgeItem.updated_at || new Date().toISOString(),
-    // Note: MetaForge doesn't provide recipe, recyclesInto, upgradeCost, etc.
-    // These fields will be missing unless we supplement from another source
+    // Crafting and recycling data from Supabase
+    recipe: craftingMap.get(metaforgeItem.id) || undefined,
+    recyclesInto: recycleMap.get(metaforgeItem.id) || undefined,
   };
 }
 
@@ -284,9 +385,21 @@ function mapMetaForgeQuestToOurFormat(metaforgeQuest: MetaForgeQuest): any {
 async function main() {
   console.log('🚀 Fetching Arc Raiders data from MetaForge API...\n');
 
-  // Fetch items from MetaForge
+  // Fetch items from MetaForge API
   const metaforgeItems = await fetchAllItems();
-  const mappedItems = metaforgeItems.map(mapMetaForgeItemToOurFormat);
+
+  // Fetch crafting and recycling data from Supabase (with rate limiting)
+  console.log('\n📥 Fetching crafting and recycling data from Supabase...');
+  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+  const [craftingMap, recycleMap] = await Promise.all([
+    fetchAllCraftingComponents(),
+    fetchAllRecycleComponents()
+  ]);
+
+  // Map items with crafting/recycling data
+  const mappedItems = metaforgeItems.map(item =>
+    mapMetaForgeItemToOurFormat(item, craftingMap, recycleMap)
+  );
 
   // Save items.json
   console.log('\n💾 Saving items.json...');

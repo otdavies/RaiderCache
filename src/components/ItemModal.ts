@@ -3,6 +3,7 @@ import { dataLoader } from '../utils/dataLoader';
 import { getMapRecommendations, getZoneInfo } from '../utils/zoneMapping';
 import type { DecisionEngine } from '../utils/decisionEngine';
 import { WeaponGrouper } from '../utils/weaponGrouping';
+import { getEnemyDropInfo, isEnemyDrop } from '../utils/enemyDrops';
 
 export interface ItemModalConfig {
   item: Item;
@@ -19,23 +20,55 @@ export class ItemModal {
     this.config = config;
   }
 
-  show(): void {
+  async show(): Promise<void> {
     const modal = document.getElementById('item-modal');
     if (!modal) return;
 
     const content = modal.querySelector('.modal-content');
     if (!content) return;
 
-    content.innerHTML = this.renderContent();
+    // Add will-change hints for smooth animations
+    const overlay = modal.querySelector('.modal-overlay') as HTMLElement;
+    if (overlay) overlay.style.willChange = 'opacity';
+    (content as HTMLElement).style.willChange = 'opacity, transform';
 
-    // Event listeners
+    // Show modal immediately
+    modal.classList.add('active');
+    this.modalElement = modal;
+
+    // Render content synchronously (lightweight without "Used to Craft")
+    content.innerHTML = this.renderContent(false);
+
+    // Defer event listener attachment to avoid blocking animation start
+    requestAnimationFrame(() => {
+      this.attachEventListeners(content, modal);
+
+      // Remove will-change after animations complete (typically 350ms)
+      setTimeout(() => {
+        if (overlay) overlay.style.willChange = 'auto';
+        (content as HTMLElement).style.willChange = 'auto';
+      }, 400);
+    });
+
+    // Load heavy "Used to Craft" section asynchronously when browser is idle
+    this.loadUsedToCraftAsync(content);
+  }
+
+  hide(): void {
+    if (this.modalElement) {
+      this.modalElement.classList.remove('active');
+      this.config.onClose();
+    }
+  }
+
+  private attachEventListeners(content: Element, modal: HTMLElement): void {
     const closeBtn = content.querySelector('[data-action="close"]');
     const overlay = modal.querySelector('.modal-overlay');
 
     closeBtn?.addEventListener('click', () => this.hide());
     overlay?.addEventListener('click', () => this.hide());
 
-    // Add click handlers for clickable items in recipes
+    // Click handlers for recipe items
     const clickableItems = content.querySelectorAll('[data-item-id]');
     clickableItems.forEach(element => {
       element.addEventListener('click', (e) => {
@@ -45,23 +78,40 @@ export class ItemModal {
         }
       });
     });
-
-    // Show modal
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-
-    this.modalElement = modal;
   }
 
-  hide(): void {
-    if (this.modalElement) {
-      this.modalElement.classList.remove('active');
-      document.body.style.overflow = '';
-      this.config.onClose();
+  private loadUsedToCraftAsync(content: Element): void {
+    const placeholder = content.querySelector('#used-to-craft-placeholder');
+    if (!placeholder) return;
+
+    // Use requestIdleCallback for non-blocking rendering
+    const callback = () => {
+      try {
+        placeholder.outerHTML = this.renderUsedToCraft(this.config.item);
+
+        // Re-attach handlers to new elements
+        const newItems = content.querySelectorAll('[data-item-id]');
+        newItems.forEach(element => {
+          element.addEventListener('click', (e) => {
+            const itemId = (e.currentTarget as HTMLElement).getAttribute('data-item-id');
+            if (itemId) this.navigateToItem(itemId);
+          });
+        });
+      } catch (error) {
+        console.error('Failed to load recipes:', error);
+        placeholder.innerHTML = '<p style="color: #888;">Failed to load recipes</p>';
+      }
+    };
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(callback, { timeout: 2000 });
+    } else {
+      // Fallback for browsers without requestIdleCallback
+      Promise.resolve().then(callback);
     }
   }
 
-  private renderContent(): string {
+  private renderContent(includeUsedToCraft: boolean = true): string {
     const { item, decisionData } = this.config;
     const iconUrl = dataLoader.getIconUrl(item);
     const itemName = item.name || '[Unknown Item]';
@@ -137,7 +187,7 @@ export class ItemModal {
 
             ${this.renderCraftingRecipe(item)}
 
-            ${this.renderUsedToCraft(item)}
+            ${includeUsedToCraft ? this.renderUsedToCraft(item) : '<div id="used-to-craft-placeholder" class="modal-loading" style="min-height: 100px;">Loading recipes...</div>'}
 
             ${Array.isArray(item.foundIn) && item.foundIn.length > 0 ? `
               <div class="item-modal__section">
@@ -153,7 +203,9 @@ export class ItemModal {
                   </div>
                 </div>
 
-                ${this.renderMapRecommendations(item.foundIn)}
+                ${this.renderEnemyDropInfo(item)}
+
+                ${this.renderMapRecommendations(item.foundIn, item.id)}
               </div>
             ` : ''}
           </div>
@@ -169,7 +221,25 @@ export class ItemModal {
     `;
   }
 
-  private renderMapRecommendations(zones: string[]): string {
+  private renderEnemyDropInfo(item: Item): string {
+    const enemyInfo = getEnemyDropInfo(item.id);
+    if (!enemyInfo) {
+      return '';
+    }
+
+    return `
+      <div class="enemy-drop-info">
+        <h4>Dropped By:</h4>
+        <div class="enemy-badge">
+          <span class="enemy-name">${enemyInfo.displayName}</span>
+          ${enemyInfo.tier ? `<span class="enemy-tier enemy-tier--${enemyInfo.tier.toLowerCase()}">${enemyInfo.tier}</span>` : ''}
+        </div>
+        <p class="map-hint">Hunt ${enemyInfo.displayName} enemies to farm this item</p>
+      </div>
+    `;
+  }
+
+  private renderMapRecommendations(zones: string[], itemId: string): string {
     const maps = getMapRecommendations(zones);
 
     if (maps.length === 0) {
@@ -188,25 +258,38 @@ export class ItemModal {
       `;
     }
 
+    // For ARC items, check if we have enemy drop info
+    const hasEnemyInfo = isEnemyDrop(itemId);
+
     if (maps.includes('All Maps')) {
       return `
         <div class="map-recommendations">
-          <h4>Check Maps:</h4>
+          <h4>Map Locations:</h4>
           <div class="map-badges">
             <span class="map-badge map-badge--all">All Raid Maps</span>
           </div>
-          <p class="map-hint">Can be looted from enemies on any map</p>
+          ${hasEnemyInfo ? '<p class="map-hint">Available on all raid maps</p>' : '<p class="map-hint">Can be looted from enemies on any map</p>'}
         </div>
       `;
     }
 
+    // Create MetaForge map links
+    const mapLinks = maps.map(map => {
+      const mapSlug = map.toLowerCase().replace(/\s+/g, '-');
+      const metaforgeUrl = `https://metaforge.app/arc-raiders/maps/${mapSlug}`;
+      return `<a href="${metaforgeUrl}" target="_blank" rel="noopener noreferrer" class="map-badge map-badge--link" title="View ${map} on MetaForge">${map} ↗</a>`;
+    }).join('');
+
     return `
       <div class="map-recommendations">
-        <h4>Check Maps:</h4>
+        <h4>Map Locations:</h4>
         <div class="map-badges">
-          ${maps.map(map => `<span class="map-badge">${map}</span>`).join('')}
+          ${mapLinks}
         </div>
-        <p class="map-hint">Look for ${zones.join(', ')} zones on these maps</p>
+        <p class="map-hint">
+          Look for <strong>${zones.join(', ')}</strong> zones on these maps
+          <br><small style="opacity: 0.7;">Click map names to view detailed locations on MetaForge</small>
+        </p>
       </div>
     `;
   }
@@ -415,22 +498,26 @@ export class ItemModal {
   }
 
   private findItemById(itemId: string): (Item & { decisionData: DecisionReason }) | undefined {
-    const items = this.config.decisionEngine.getItemsWithDecisions({
+    // OPTIMIZATION: Don't recalculate ALL items - use cached version
+    // Access private 'items' map directly to avoid scanning all 485 items
+    const item = (this.config.decisionEngine as any).items.get(itemId);
+    if (!item) return undefined;
+
+    // Get the decision for just this specific item (much faster than getItemsWithDecisions)
+    const decisionData = this.config.decisionEngine.getDecision(item, {
       completedQuests: [],
       completedProjects: [],
       hideoutLevels: {},
       lastUpdated: Date.now()
     });
-    return items.find(i => i.id === itemId);
+
+    return { ...item, decisionData };
   }
 
   private findItemByIdSimple(itemId: string): Item | undefined {
-    const itemWithDecision = this.findItemById(itemId);
-    if (!itemWithDecision) return undefined;
-
-    // Return a plain Item without the decisionData property
-    const { decisionData, ...item } = itemWithDecision;
-    return item as Item;
+    // FAST: Direct Map lookup without any decision calculation
+    // This is called for every ingredient in recipes, so must be instant
+    return (this.config.decisionEngine as any).items.get(itemId);
   }
 
   private navigateToItem(itemId: string): void {
