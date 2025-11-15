@@ -4,6 +4,7 @@ import { getMapRecommendations, getZoneInfo } from '../utils/zoneMapping';
 import type { DecisionEngine } from '../utils/decisionEngine';
 import { WeaponGrouper } from '../utils/weaponGrouping';
 import { getEnemyDropInfo, isEnemyDrop } from '../utils/enemyDrops';
+import { MapView } from './MapView';
 
 export interface ItemModalConfig {
   item: Item;
@@ -43,11 +44,11 @@ export class ItemModal {
     requestAnimationFrame(() => {
       this.attachEventListeners(content, modal);
 
-      // Remove will-change after animations complete (typically 350ms)
+      // Remove will-change after animations complete (200ms)
       setTimeout(() => {
         if (overlay) overlay.style.willChange = 'auto';
         (content as HTMLElement).style.willChange = 'auto';
-      }, 400);
+      }, 250);
     });
 
     // Load heavy "Used to Craft" section asynchronously when browser is idle
@@ -78,6 +79,10 @@ export class ItemModal {
         }
       });
     });
+
+    // View map button
+    const viewMapBtn = content.querySelector('[data-action="view-map"]');
+    viewMapBtn?.addEventListener('click', () => this.openMapView());
   }
 
   private loadUsedToCraftAsync(content: Element): void {
@@ -194,13 +199,14 @@ export class ItemModal {
                 <h3>Location & Maps</h3>
 
                 <div class="location-zones">
-                  <h4>Found In:</h4>
+                  <h4>Zone Types:</h4>
                   <div class="zone-badges">
                     ${item.foundIn.map(location => {
                       const zoneInfo = getZoneInfo(location);
                       return `<span class="zone-badge" style="--zone-color: ${zoneInfo?.color || '#6b7280'}" title="${zoneInfo?.description || location}">${location}</span>`;
                     }).join('')}
                   </div>
+                  <p class="zone-hint">Search for loot containers in these zone types</p>
                 </div>
 
                 ${this.renderEnemyDropInfo(item)}
@@ -246,52 +252,99 @@ export class ItemModal {
       return '';
     }
 
-    // Handle special cases
+    // Handle Hideout vendor items
     if (maps.includes('Hideout')) {
       return `
         <div class="map-recommendations">
           <h4>Available At:</h4>
-          <div class="map-badges">
-            <span class="map-badge map-badge--vendor">Hideout Vendor</span>
+          <div class="vendor-info">
+            <span class="map-badge map-badge--vendor">Hideout - Exodus Vendor</span>
+            <p class="map-hint">Purchase this item from the Exodus faction vendor in your Hideout</p>
           </div>
         </div>
       `;
     }
 
-    // For ARC items, check if we have enemy drop info
+    // Handle ARC enemy drops - available on all maps
     const hasEnemyInfo = isEnemyDrop(itemId);
-
     if (maps.includes('All Maps')) {
       return `
         <div class="map-recommendations">
-          <h4>Map Locations:</h4>
-          <div class="map-badges">
-            <span class="map-badge map-badge--all">All Raid Maps</span>
+          <h4>Where to Find:</h4>
+          <div class="all-maps-info">
+            <span class="map-badge map-badge--all">Available on All Raid Maps</span>
+            <p class="map-hint">${hasEnemyInfo ? 'Hunt ARC enemies on any raid map to farm this item' : 'Can be looted from enemies across all raid maps'}</p>
           </div>
-          ${hasEnemyInfo ? '<p class="map-hint">Available on all raid maps</p>' : '<p class="map-hint">Can be looted from enemies on any map</p>'}
         </div>
       `;
     }
 
-    // Create MetaForge map links
-    const mapLinks = maps.map(map => {
-      const mapSlug = map.toLowerCase().replace(/\s+/g, '-');
-      const metaforgeUrl = `https://metaforge.app/arc-raiders/maps/${mapSlug}`;
-      return `<a href="${metaforgeUrl}" target="_blank" rel="noopener noreferrer" class="map-badge map-badge--link" title="View ${map} on MetaForge">${map} ↗</a>`;
-    }).join('');
+    // Get zone details for helpful information
+    const zoneDetails = zones.map(z => getZoneInfo(z)).filter(Boolean);
+    const zoneCategories = new Set(zoneDetails.map(z => z!.category));
+
+    // Create categorized zone description
+    let zoneDescription = '';
+    if (zoneCategories.has('building')) {
+      const buildingZones = zoneDetails.filter(z => z!.category === 'building').map(z => z!.displayName);
+      zoneDescription = `Look inside <strong>${buildingZones.join(', ')}</strong> buildings`;
+    } else if (zoneCategories.has('environment')) {
+      const envZones = zoneDetails.filter(z => z!.category === 'environment').map(z => z!.displayName);
+      zoneDescription = `Search <strong>${envZones.join(', ')}</strong> areas`;
+    } else {
+      zoneDescription = `Search <strong>${zones.join(', ')}</strong> zones`;
+    }
 
     return `
       <div class="map-recommendations">
         <h4>Map Locations:</h4>
-        <div class="map-badges">
-          ${mapLinks}
+        <button class="btn btn--map" data-action="view-map">
+          View Interactive Map
+        </button>
+        <div class="location-help">
+          <p class="map-hint">
+            ${zoneDescription} - click "View Interactive Map" for precise locations
+          </p>
         </div>
-        <p class="map-hint">
-          Look for <strong>${zones.join(', ')}</strong> zones on these maps
-          <br><small style="opacity: 0.7;">Click map names to view detailed locations on MetaForge</small>
-        </p>
       </div>
     `;
+  }
+
+  private async openMapView(): Promise<void> {
+    const { item } = this.config;
+
+    // Create map view modal container
+    const mapViewModal = document.createElement('div');
+    mapViewModal.id = 'map-view-modal';
+    mapViewModal.className = 'modal active';
+    mapViewModal.innerHTML = `
+      <div class="modal-overlay"></div>
+      <div class="modal-content modal-content--map">
+        <div id="map-view-container"></div>
+      </div>
+    `;
+
+    document.body.appendChild(mapViewModal);
+
+    // Create and initialize MapView
+    const mapView = new MapView({
+      item,
+      onClose: () => {
+        mapView.hide();
+        document.body.removeChild(mapViewModal);
+      }
+    });
+
+    try {
+      await mapView.init();
+      const container = mapViewModal.querySelector('#map-view-container') as HTMLElement;
+      if (container) {
+        mapView.render(container);
+      }
+    } catch (error) {
+      console.error('Failed to load map view:', error);
+      document.body.removeChild(mapViewModal);
+    }
   }
 
   private getDecisionLabel(decision: string): string {

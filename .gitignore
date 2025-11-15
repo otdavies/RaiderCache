@@ -45,3 +45,7 @@ lerna-debug.log*
 public/assets/icons/.resized
 
 claude.md
+
+docs/
+metaforge-js/
+research/

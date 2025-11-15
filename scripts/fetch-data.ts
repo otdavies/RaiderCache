@@ -14,10 +14,12 @@ const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const DATA_DIR = path.join(PUBLIC_DIR, 'data');
 const STATIC_DATA_DIR = path.join(DATA_DIR, 'static');
 const ICONS_DIR = path.join(PUBLIC_DIR, 'assets', 'icons');
+const MAPS_DIR = path.join(PUBLIC_DIR, 'assets', 'maps');
+const TILES_DIR = path.join(MAPS_DIR, 'tiles');
 const RESIZED_MARKER = path.join(ICONS_DIR, '.resized');
 
 // Ensure directories exist
-[PUBLIC_DIR, DATA_DIR, STATIC_DATA_DIR, ICONS_DIR].forEach(dir => {
+[PUBLIC_DIR, DATA_DIR, STATIC_DATA_DIR, ICONS_DIR, MAPS_DIR, TILES_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -74,6 +76,28 @@ interface SupabaseComponent {
   updated_at: string;
 }
 
+interface MapMarker {
+  id: string;
+  subcategory: string;
+  lat: number;
+  lng: number;
+  map: string;
+  category: string;
+  instance_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface MapData {
+  map: string;
+  markers: MapMarker[];
+  stats: {
+    totalMarkers: number;
+    byCategory: Record<string, number>;
+    bySubcategory: Record<string, number>;
+  };
+}
+
 function downloadFile(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
@@ -103,10 +127,41 @@ function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
+async function cleanupTempFile(tmpPath: string, maxRetries: number = 3): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await fs.promises.unlink(tmpPath);
+      return; // Success
+    } catch (error: any) {
+      // On Windows, files may be briefly locked by Sharp
+      if (error.code === 'EBUSY' || error.code === 'EPERM') {
+        if (i < maxRetries - 1) {
+          // Wait a bit for file handles to release
+          await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+          continue;
+        }
+      }
+      // If not a locking issue or final retry, ignore cleanup failure
+      // Temp files aren't critical and will be cleaned up on next run
+    }
+  }
+}
+
 async function convertWebPToPNG(webpUrl: string, outputPath: string): Promise<boolean> {
   const tmpWebP = outputPath + '.tmp.webp';
 
   try {
+    // Clean up any existing temp file before downloading
+    if (fs.existsSync(tmpWebP)) {
+      await cleanupTempFile(tmpWebP);
+
+      // Verify cleanup succeeded - if file still exists, skip this icon
+      if (fs.existsSync(tmpWebP)) {
+        console.warn(`  ⚠️  Skipping ${path.basename(outputPath)} - temp file locked`);
+        return false;
+      }
+    }
+
     // Download WebP
     await downloadFile(webpUrl, tmpWebP);
 
@@ -125,15 +180,16 @@ async function convertWebPToPNG(webpUrl: string, outputPath: string): Promise<bo
       .toColorspace('srgb')
       .toFile(outputPath);
 
-    // Clean up temp file
-    fs.unlinkSync(tmpWebP);
-
     // Verify the output
     const metadata = await sharp(outputPath).metadata();
     if (!metadata.width || !metadata.height || metadata.format !== 'png') {
       console.warn(`  ⚠️  Invalid PNG output for ${path.basename(outputPath)}`);
+      await cleanupTempFile(tmpWebP);
       return false;
     }
+
+    // Clean up temp file with retry logic for Windows file locking
+    await cleanupTempFile(tmpWebP);
 
     return true;
   } catch (error) {
@@ -141,9 +197,7 @@ async function convertWebPToPNG(webpUrl: string, outputPath: string): Promise<bo
 
     // Clean up any temp files
     if (fs.existsSync(tmpWebP)) {
-      try {
-        fs.unlinkSync(tmpWebP);
-      } catch {}
+      await cleanupTempFile(tmpWebP);
     }
 
     return false;
@@ -343,6 +397,356 @@ async function fetchAllRecycleComponents(): Promise<Map<string, Record<string, n
   }
 }
 
+async function fetchAllMapData(): Promise<MapData[]> {
+  console.log('📥 Fetching map marker data from MetaForge Supabase...');
+
+  // Discover available maps from the database
+  console.log('  🔍 Auto-discovering available maps...');
+  const allMarkers = await fetchSupabase<MapMarker[]>('arc_map_data', 'select=map');
+  const uniqueMaps = [...new Set(allMarkers.map(m => m.map))].sort();
+  console.log(`  ✅ Found ${uniqueMaps.length} maps: ${uniqueMaps.join(', ')}`);
+
+  const mapDataArray: MapData[] = [];
+
+  for (const mapName of uniqueMaps) {
+    try {
+      console.log(`  Fetching markers for ${mapName}...`);
+
+      const markers = await fetchSupabase<MapMarker[]>(
+        'arc_map_data',
+        `map=eq.${mapName}&select=*`
+      );
+
+      // Calculate stats
+      const byCategory: Record<string, number> = {};
+      const bySubcategory: Record<string, number> = {};
+
+      for (const marker of markers) {
+        byCategory[marker.category] = (byCategory[marker.category] || 0) + 1;
+        bySubcategory[marker.subcategory] = (bySubcategory[marker.subcategory] || 0) + 1;
+      }
+
+      const mapData: MapData = {
+        map: mapName,
+        markers,
+        stats: {
+          totalMarkers: markers.length,
+          byCategory,
+          bySubcategory
+        }
+      };
+
+      mapDataArray.push(mapData);
+      console.log(`  ✅ ${mapName}: ${markers.length} markers`);
+
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error(`  ❌ Failed to fetch map data for ${mapName}:`, error);
+    }
+  }
+
+  const totalMarkers = mapDataArray.reduce((sum, m) => sum + m.stats.totalMarkers, 0);
+  console.log(`✅ Total map markers fetched: ${totalMarkers}`);
+  return mapDataArray;
+}
+
+async function fetchMapImages(mapNames: string[]): Promise<number> {
+  console.log('📥 Downloading map images from MetaForge CDN...');
+
+  let downloadedCount = 0;
+  let skippedCount = 0;
+
+  for (const mapName of mapNames) {
+    const mapUrl = `https://cdn.metaforge.app/arc-raiders/ui/${mapName}.webp`;
+    const destPath = path.join(MAPS_DIR, `${mapName}.webp`);
+
+    try {
+      // Always redownload to check for updates
+      if (fs.existsSync(destPath)) {
+        console.log(`  🔄 Re-downloading ${mapName}.webp to check for updates...`);
+        fs.unlinkSync(destPath); // Delete old version
+      }
+
+      await downloadFile(mapUrl, destPath);
+      console.log(`  ✅ Downloaded ${mapName}.webp`);
+      downloadedCount++;
+
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error(`  ❌ Failed to download ${mapName}.webp:`, error);
+    }
+  }
+
+  console.log(`✅ Map images: ${downloadedCount} downloaded, ${skippedCount} already existed`);
+  return downloadedCount;
+}
+
+async function testTileUrl(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    https.request(url, { method: 'HEAD' }, (res) => {
+      resolve(res.statusCode === 200);
+    }).on('error', () => resolve(false)).end();
+  });
+}
+
+async function discoverMapTilePattern(mapName: string): Promise<{ baseUrl: string; separator: string } | null> {
+  console.log(`  🔍 Discovering tile pattern for ${mapName}...`);
+
+  // Generate name variations
+  const nameWithUnderscore = mapName.replace(/-/g, '_');
+  const nameVariations = [mapName];
+  if (nameWithUnderscore !== mapName) {
+    nameVariations.push(nameWithUnderscore);
+  }
+
+  // Generate historical dates (last 6 months of possible dates)
+  const historicalDates: string[] = [];
+  for (let monthsAgo = 0; monthsAgo < 6; monthsAgo++) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - monthsAgo);
+    historicalDates.push(date.toISOString().slice(0, 10).replace(/-/g, ''));
+  }
+
+  const patterns = [];
+
+  // For each name variation, try all patterns
+  for (const name of nameVariations) {
+    patterns.push(
+      // Current known patterns
+      { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}-new/0/0_0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}-new`, separator: '_', label: `${name}-new` },
+      { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/v2/0/0/0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/v2`, separator: '/', label: `${name}/v2` },
+      { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/20251030/0/0/0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/20251030`, separator: '/', label: `${name}/20251030` },
+
+      // Try version numbers 1-10
+      ...Array.from({ length: 10 }, (_, i) => ({
+        url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/v${i + 1}/0/0/0.webp`,
+        baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/v${i + 1}`,
+        separator: '/',
+        label: `${name}/v${i + 1}`
+      })),
+
+      // Try historical dates
+      ...historicalDates.map(date => ({
+        url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/${date}/0/0/0.webp`,
+        baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/${date}`,
+        separator: '/',
+        label: `${name}/${date}`
+      })),
+
+      // Base patterns without version/date
+      { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/0/0_0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}`, separator: '_', label: `${name}/base_` },
+      { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/0/0/0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}`, separator: '/', label: `${name}/base/` }
+    );
+  }
+
+  console.log(`  Testing ${patterns.length} URL patterns...`);
+  let testedCount = 0;
+
+  for (const pattern of patterns) {
+    testedCount++;
+    const exists = await testTileUrl(pattern.url);
+    if (exists) {
+      console.log(`  ✅ Found pattern: ${pattern.baseUrl} (separator: '${pattern.separator}') after testing ${testedCount}/${patterns.length} patterns`);
+      return { baseUrl: pattern.baseUrl, separator: pattern.separator };
+    }
+    // Show progress every 5 patterns
+    if (testedCount % 5 === 0) {
+      console.log(`  Tested ${testedCount}/${patterns.length} patterns...`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 50)); // Rate limiting
+  }
+
+  console.warn(`  ⚠️  Tiles not available for ${mapName} (tested ${patterns.length} URL patterns)`);
+  console.warn(`  This map may be newly added and tiles haven't been uploaded to the CDN yet.`);
+  return null;
+}
+
+async function downloadMapTiles(mapNames: string[]): Promise<number> {
+  console.log('📥 Downloading map tiles from MetaForge CDN...');
+  console.log('  🔄 Re-downloading all tiles to check for updates...');
+
+  const maxZoom = 4;
+
+  let totalDownloaded = 0;
+  let totalSkipped = 0;
+  let totalFailed = 0;
+
+  for (const mapName of mapNames) {
+    console.log(`\n  📍 Processing ${mapName}...`);
+
+    // Discover the correct tile pattern dynamically
+    const pattern = await discoverMapTilePattern(mapName);
+
+    if (!pattern) {
+      console.warn(`  ⚠️  Skipping ${mapName} - no valid tile pattern found`);
+      totalFailed++;
+      continue;
+    }
+
+    const config = { name: mapName, ...pattern, maxZoom };
+    const mapTilesDir = path.join(TILES_DIR, config.name);
+
+    if (!fs.existsSync(mapTilesDir)) {
+      fs.mkdirSync(mapTilesDir, { recursive: true });
+    }
+
+    let mapDownloaded = 0;
+    let mapSkipped = 0;
+
+    // Download tiles for each zoom level
+    for (let z = 0; z <= config.maxZoom; z++) {
+      const zoomDir = path.join(mapTilesDir, z.toString());
+      if (!fs.existsSync(zoomDir)) {
+        fs.mkdirSync(zoomDir, { recursive: true });
+      }
+
+      // For zoom level z, we have 2^z tiles in each dimension
+      const maxTileIndex = Math.pow(2, z);
+
+      for (let x = 0; x < maxTileIndex; x++) {
+        for (let y = 0; y < maxTileIndex; y++) {
+          // Always save tiles in flat structure: {x}_{y}.webp
+          const tileFilename = `${x}_${y}.webp`;
+          const tilePath = path.join(zoomDir, tileFilename);
+
+          // Construct tile URL based on MetaForge's serving pattern
+          const tileUrl = config.separator === '_'
+            ? `${config.baseUrl}/${z}/${x}_${y}.webp`
+            : `${config.baseUrl}/${z}/${x}/${y}.webp`;
+
+          try {
+            // Test if tile exists (HEAD request)
+            const response = await new Promise<{ statusCode?: number }>((resolve) => {
+              https.request(tileUrl, { method: 'HEAD' }, (res) => {
+                resolve({ statusCode: res.statusCode });
+              }).on('error', () => resolve({})).end();
+            });
+
+            if (response.statusCode !== 200) {
+              // Tile doesn't exist, skip
+              continue;
+            }
+
+            // Download the tile (always redownload to check for updates)
+            await downloadFile(tileUrl, tilePath);
+            mapDownloaded++;
+
+            // Rate limiting - be respectful to CDN
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (error) {
+            // Silently skip missing tiles
+          }
+        }
+      }
+    }
+
+    console.log(`  ✅ ${config.name}: ${mapDownloaded} tiles downloaded, ${mapSkipped} already existed`);
+    totalDownloaded += mapDownloaded;
+    totalSkipped += mapSkipped;
+  }
+
+  if (totalFailed > 0) {
+    console.warn(`\n⚠️  Map tiles complete: ${totalDownloaded} downloaded, ${totalSkipped} already existed, ${totalFailed} maps failed`);
+  } else {
+    console.log(`\n✅ Map tiles complete: ${totalDownloaded} downloaded, ${totalSkipped} already existed`);
+  }
+  return totalDownloaded;
+}
+
+/**
+ * Calculate map extents from downloaded tiles
+ */
+async function calculateMapExtents(): Promise<void> {
+  console.log('\n📐 Calculating map extents from tiles...');
+
+  const mapExtents: Record<string, {
+    worldExtent: [number, number, number, number];
+    tileSize: number;
+    center: [number, number];
+    tilesWide: number;
+    tilesHigh: number;
+  }> = {};
+
+  const tileSizes: Record<string, number> = {
+    'dam': 256,
+    'spaceport': 512,
+    'buried-city': 512,
+    'blue-gate': 512
+  };
+
+  const mapDirs = fs.readdirSync(TILES_DIR).filter(f =>
+    fs.statSync(path.join(TILES_DIR, f)).isDirectory()
+  );
+
+  for (const mapName of mapDirs) {
+    const mapPath = path.join(TILES_DIR, mapName);
+
+    // Find max zoom level
+    const zoomLevels = fs.readdirSync(mapPath)
+      .filter(f => fs.statSync(path.join(mapPath, f)).isDirectory())
+      .map(f => parseInt(f))
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+
+    if (zoomLevels.length === 0) continue;
+
+    const maxZoom = zoomLevels[zoomLevels.length - 1];
+    const maxZoomPath = path.join(mapPath, maxZoom.toString());
+
+    // Read all tiles at max zoom
+    const tiles = fs.readdirSync(maxZoomPath)
+      .filter(f => f.endsWith('.webp'))
+      .map(f => {
+        const match = f.match(/^(\d+)_(\d+)\.webp$/);
+        if (match) {
+          return { x: parseInt(match[1]), y: parseInt(match[2]) };
+        }
+        return null;
+      })
+      .filter(t => t !== null) as { x: number; y: number }[];
+
+    if (tiles.length === 0) continue;
+
+    // Calculate extents
+    const minX = Math.min(...tiles.map(t => t.x));
+    const maxX = Math.max(...tiles.map(t => t.x));
+    const minY = Math.min(...tiles.map(t => t.y));
+    const maxY = Math.max(...tiles.map(t => t.y));
+
+    const tilesWide = maxX - minX + 1;
+    const tilesHigh = maxY - minY + 1;
+    const tileSize = tileSizes[mapName] || 512;
+
+    const widthPx = tilesWide * tileSize;
+    const heightPx = tilesHigh * tileSize;
+
+    // WorldExtent is always 2x the actual tile dimensions
+    const worldWidth = widthPx * 2;
+    const worldHeight = heightPx * 2;
+
+    mapExtents[mapName] = {
+      worldExtent: [0, 0, worldWidth, worldHeight],
+      tileSize,
+      center: [worldWidth / 2, worldHeight / 2],
+      tilesWide,
+      tilesHigh
+    };
+
+    console.log(`  ✅ ${mapName}: ${widthPx}×${heightPx}px → worldExtent: ${worldWidth}×${worldHeight} (${tilesWide}×${tilesHigh} tiles @ ${tileSize}px)`);
+  }
+
+  // Save to a config file for reference
+  const configPath = path.join(DATA_DIR, 'map-extents.json');
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify(mapExtents, null, 2)
+  );
+
+  console.log(`\n✅ Map extents saved to ${configPath}`);
+}
+
 function mapMetaForgeItemToOurFormat(
   metaforgeItem: MetaForgeItem,
   craftingMap: Map<string, Record<string, number>>,
@@ -421,8 +825,48 @@ async function main() {
   );
   console.log(`✅ Saved ${mappedQuests.length} quests to quests.json`);
 
+  // Fetch map data from Supabase
+  console.log('\n📥 Fetching map data from Supabase...');
+  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+  const mapData = await fetchAllMapData();
+
+  // Save map data
+  console.log('\n💾 Saving map data...');
+  fs.writeFileSync(
+    path.join(DATA_DIR, 'maps.json'),
+    JSON.stringify(mapData, null, 2)
+  );
+  const totalMapMarkers = mapData.reduce((sum, m) => sum + m.stats.totalMarkers, 0);
+  console.log(`✅ Saved map data with ${totalMapMarkers} markers across ${mapData.length} maps`);
+
+  // Extract discovered map names
+  const discoveredMaps = mapData.map(m => m.map);
+
+  // Download map images
+  console.log('\n📥 Downloading map images...');
+  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+  await fetchMapImages(discoveredMaps);
+
+  // Download map tiles
+  console.log('\n📥 Downloading map tiles...');
+  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+  await downloadMapTiles(discoveredMaps);
+
+  // Calculate map extents from downloaded tiles
+  await calculateMapExtents();
+
   // Download and convert icons
   console.log('\n📥 Downloading and converting item icons from WebP to PNG...');
+
+  // Clean up any leftover temporary files from previous runs
+  const tempFiles = fs.readdirSync(ICONS_DIR).filter(f => f.endsWith('.tmp.webp'));
+  if (tempFiles.length > 0) {
+    console.log(`  🧹 Cleaning up ${tempFiles.length} leftover temporary files...`);
+    for (const tempFile of tempFiles) {
+      await cleanupTempFile(path.join(ICONS_DIR, tempFile));
+    }
+  }
+
   const resizedIcons = loadResizedIcons();
 
   let downloadedIcons = 0;
@@ -473,11 +917,18 @@ async function main() {
   // Create metadata file
   const metadata = {
     lastUpdated: new Date().toISOString(),
-    source: 'https://metaforge.app/arc-raiders (items & quests)',
+    source: 'https://metaforge.app/arc-raiders (items, quests, maps)',
     staticSource: 'Local static files (hideout modules & projects)',
-    version: '2.0.0',
+    version: '2.1.0',
     itemCount: mappedItems.length,
-    questCount: mappedQuests.length
+    questCount: mappedQuests.length,
+    mapCount: mapData.length,
+    mapMarkerCount: totalMapMarkers,
+    maps: mapData.map(m => ({
+      name: m.map,
+      markerCount: m.stats.totalMarkers,
+      categories: Object.keys(m.stats.byCategory).length
+    }))
   };
 
   fs.writeFileSync(
@@ -489,6 +940,8 @@ async function main() {
   console.log(`📊 Last updated: ${metadata.lastUpdated}`);
   console.log(`📦 Total items: ${metadata.itemCount}`);
   console.log(`🎯 Total quests: ${metadata.questCount}`);
+  console.log(`🗺️  Total maps: ${metadata.mapCount}`);
+  console.log(`📍 Total map markers: ${metadata.mapMarkerCount}`);
   console.log(`\n⚠️  Note: Hideout modules and projects are stored in public/data/static/ and are not updated by this script.`);
 }
 

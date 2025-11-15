@@ -6,6 +6,20 @@ export interface SearchableItem extends Item {
   decisionData: DecisionReason;
 }
 
+/**
+ * Determines if an item is a cosmetic (outfit, emote, charm, color)
+ */
+export function isCosmetic(item: Item): boolean {
+  const name = item.name?.toLowerCase() || '';
+  return (
+    name.includes('(outfit)') ||
+    name.includes('(emote)') ||
+    name.includes('(backpack charm)') ||
+    name.includes('(color)') ||
+    name.includes('(colour)')
+  );
+}
+
 export class SearchEngine {
   private fuse: Fuse<SearchableItem>;
 

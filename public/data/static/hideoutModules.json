@@ -12,7 +12,7 @@
         "level": 2,
         "requirementItemIds": [
           {
-            "itemId": "dog_collar",
+            "item_id": "dog-collar",
             "quantity": 1
           }
         ]
@@ -21,11 +21,11 @@
         "level": 3,
         "requirementItemIds": [
           {
-            "itemId": "lemon",
+            "item_id": "lemon",
             "quantity": 3
           },
           {
-            "itemId": "apricot",
+            "item_id": "apricot",
             "quantity": 3
           }
         ]
@@ -34,15 +34,15 @@
         "level": 4,
         "requirementItemIds": [
           {
-            "itemId": "prickly_pear",
+            "item_id": "prickly-pear",
             "quantity": 6
           },
           {
-            "itemId": "olives",
+            "item_id": "olives",
             "quantity": 6
           },
           {
-            "itemId": "cat_bed",
+            "item_id": "cat-bed",
             "quantity": 1
           }
         ]
@@ -51,15 +51,15 @@
         "level": 5,
         "requirementItemIds": [
           {
-            "itemId": "mushroom",
+            "item_id": "mushroom",
             "quantity": 12
           },
           {
-            "itemId": "apricot",
+            "item_id": "apricot",
             "quantity": 12
           },
           {
-            "itemId": "very_comfortable_pillow",
+            "item_id": "very-comfortable-pillow",
             "quantity": 3
           }
         ]
@@ -81,11 +81,11 @@
         "level": 1,
         "requirementItemIds": [
           {
-            "itemId": "metal_parts",
+            "item_id": "metal-parts",
             "quantity": 20
           },
           {
-            "itemId": "rubber_parts",
+            "item_id": "rubber-parts-recipe",
             "quantity": 30
           }
         ]
@@ -94,15 +94,15 @@
         "level": 2,
         "requirementItemIds": [
           {
-            "itemId": "rusted_tools",
+            "item_id": "rusted-tools",
             "quantity": 3
           },
           {
-            "itemId": "mechanical_components",
+            "item_id": "mechanical-components",
             "quantity": 5
           },
           {
-            "itemId": "wasp_driver",
+            "item_id": "wasp-driver",
             "quantity": 8
           }
         ]
@@ -111,15 +111,15 @@
         "level": 3,
         "requirementItemIds": [
           {
-            "itemId": "rusted_gear",
+            "item_id": "rusted-gear",
             "quantity": 3
           },
           {
-            "itemId": "advanced_mechanical_components",
+            "item_id": "advanced-mechanical-components",
             "quantity": 5
           },
           {
-            "itemId": "sentinel_firing_core",
+            "item_id": "sentinel-part",
             "quantity": 4
           }
         ]
@@ -135,11 +135,11 @@
         "level": 1,
         "requirementItemIds": [
           {
-            "itemId": "plastic_parts",
+            "item_id": "plastic-parts",
             "quantity": 25
           },
           {
-            "itemId": "fabric",
+            "item_id": "fabric",
             "quantity": 30
           }
         ]
@@ -148,15 +148,15 @@
         "level": 2,
         "requirementItemIds": [
           {
-            "itemId": "power_cable",
+            "item_id": "power-cable",
             "quantity": 3
           },
           {
-            "itemId": "electrical_components",
+            "item_id": "electrical-components",
             "quantity": 5
           },
           {
-            "itemId": "hornet_driver",
+            "item_id": "hornet-driver",
             "quantity": 5
           }
         ]
@@ -165,15 +165,15 @@
         "level": 3,
         "requirementItemIds": [
           {
-            "itemId": "industrial_battery",
+            "item_id": "industrial-battery",
             "quantity": 3
           },
           {
-            "itemId": "advanced_electrical_components",
+            "item_id": "advanced-electrical-components",
             "quantity": 5
           },
           {
-            "itemId": "bastion_cell",
+            "item_id": "bastion-part",
             "quantity": 6
           }
         ]
@@ -189,11 +189,11 @@
         "level": 1,
         "requirementItemIds": [
           {
-            "itemId": "fabric",
+            "item_id": "fabric",
             "quantity": 50
           },
           {
-            "itemId": "arc_alloy",
+            "item_id": "arc-alloy",
             "quantity": 6
           }
         ]
@@ -202,15 +202,15 @@
         "level": 2,
         "requirementItemIds": [
           {
-            "itemId": "cracked_bioscanner",
+            "item_id": "cracked-bioscanner",
             "quantity": 2
           },
           {
-            "itemId": "durable_cloth",
+            "item_id": "durable-cloth",
             "quantity": 5
           },
           {
-            "itemId": "tick_pod",
+            "item_id": "tick-pod",
             "quantity": 8
           }
         ]
@@ -219,15 +219,15 @@
         "level": 3,
         "requirementItemIds": [
           {
-            "itemId": "rusted_shut_medical_kit",
+            "item_id": "rusted-shut-medical-kit",
             "quantity": 3
           },
           {
-            "itemId": "antiseptic",
+            "item_id": "antiseptic",
             "quantity": 8
           },
           {
-            "itemId": "surveyor_vault",
+            "item_id": "surveyor-vault",
             "quantity": 5
           }
         ]
@@ -243,11 +243,11 @@
         "level": 1,
         "requirementItemIds": [
           {
-            "itemId": "rubber_parts",
+            "item_id": "rubber-parts-recipe",
             "quantity": 50
           },
           {
-            "itemId": "arc_alloy",
+            "item_id": "arc-alloy",
             "quantity": 6
           }
         ]
@@ -256,15 +256,15 @@
         "level": 2,
         "requirementItemIds": [
           {
-            "itemId": "synthesized_fuel",
+            "item_id": "synthesized-fuel",
             "quantity": 3
           },
           {
-            "itemId": "crude_explosives",
+            "item_id": "crude-explosives",
             "quantity": 5
           },
           {
-            "itemId": "pop_trigger",
+            "item_id": "pop-trigger",
             "quantity": 5
           }
         ]
@@ -273,15 +273,15 @@
         "level": 3,
         "requirementItemIds": [
           {
-            "itemId": "laboratory_reagents",
+            "item_id": "laboratory-reagents",
             "quantity": 3
           },
           {
-            "itemId": "explosive_compound",
+            "item_id": "explosive-compound",
             "quantity": 5
           },
           {
-            "itemId": "rocketeer_driver",
+            "item_id": "rocketeer-part",
             "quantity": 3
           }
         ]
@@ -297,11 +297,11 @@
         "level": 1,
         "requirementItemIds": [
           {
-            "itemId": "plastic_parts",
+            "item_id": "plastic-parts",
             "quantity": 50
           },
           {
-            "itemId": "arc_alloy",
+            "item_id": "arc-alloy",
             "quantity": 6
           }
         ]
@@ -310,15 +310,15 @@
         "level": 2,
         "requirementItemIds": [
           {
-            "itemId": "damaged_heat_sink",
+            "item_id": "damaged-heat-sink",
             "quantity": 2
           },
           {
-            "itemId": "electrical_components",
+            "item_id": "electrical-components",
             "quantity": 5
           },
           {
-            "itemId": "snitch_scanner",
+            "item_id": "snitch-scanner",
             "quantity": 6
           }
         ]
@@ -327,15 +327,15 @@
         "level": 3,
         "requirementItemIds": [
           {
-            "itemId": "fried_motherboard",
+            "item_id": "fried-motherboard",
             "quantity": 3
           },
           {
-            "itemId": "advanced_electrical_components",
+            "item_id": "advanced-electrical-components",
             "quantity": 5
           },
           {
-            "itemId": "leaper_pulse_unit",
+            "item_id": "leaper-pulse-unit",
             "quantity": 4
           }
         ]
@@ -351,11 +351,11 @@
         "level": 1,
         "requirementItemIds": [
           {
-            "itemId": "metal_parts",
+            "item_id": "metal-parts",
             "quantity": 60
           },
           {
-            "itemId": "arc_powercell",
+            "item_id": "arc-powercell",
             "quantity": 5
           }
         ]
@@ -364,15 +364,15 @@
         "level": 2,
         "requirementItemIds": [
           {
-            "itemId": "toaster",
+            "item_id": "toaster",
             "quantity": 3
           },
           {
-            "itemId": "arc_motion_core",
+            "item_id": "arc-motion-core",
             "quantity": 5
           },
           {
-            "itemId": "fireball_burner",
+            "item_id": "fireball-burner",
             "quantity": 8
           }
         ]
@@ -381,15 +381,15 @@
         "level": 3,
         "requirementItemIds": [
           {
-            "itemId": "motor",
+            "item_id": "motor",
             "quantity": 3
           },
           {
-            "itemId": "arc_circuitry",
+            "item_id": "arc-circuitry",
             "quantity": 10
           },
           {
-            "itemId": "bombardier_cell",
+            "item_id": "bombardier-cell",
             "quantity": 6
           }
         ]

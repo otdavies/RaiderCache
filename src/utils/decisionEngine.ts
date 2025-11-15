@@ -230,14 +230,14 @@ export class DecisionEngine {
 
       if (quest.requirements && quest.requirements.length > 0) {
         isRequired = quest.requirements.some(
-          req => req.itemId === item.id
+          req => req.item_id === item.id
         );
       }
 
       // Also check rewardItemIds (the actual data structure uses this)
       if (!isRequired && quest.rewardItemIds && quest.rewardItemIds.length > 0) {
         isRequired = quest.rewardItemIds.some(
-          reward => reward.itemId === item.id
+          reward => reward.item_id === item.id
         );
       }
 
@@ -272,7 +272,7 @@ export class DecisionEngine {
       // Check legacy requirements format
       if (project.requirements && project.requirements.length > 0) {
         isRequired = project.requirements.some(
-          req => req.itemId === item.id
+          req => req.item_id === item.id
         );
       }
 
@@ -280,7 +280,7 @@ export class DecisionEngine {
       if (!isRequired && project.phases && project.phases.length > 0) {
         for (const phase of project.phases) {
           if (phase.requirementItemIds && phase.requirementItemIds.length > 0) {
-            if (phase.requirementItemIds.some(req => req.itemId === item.id)) {
+            if (phase.requirementItemIds.some(req => req.item_id === item.id)) {
               isRequired = true;
               break;
             }
@@ -333,7 +333,7 @@ export class DecisionEngine {
         }
 
         const isRequired = levelData.requirementItemIds.some(
-          req => req.itemId === item.id
+          req => req.item_id === item.id
         );
 
         if (isRequired) {

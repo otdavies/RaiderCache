@@ -55,7 +55,7 @@
           <!-- Sidebar with Filters and Workshop Progress -->
           <aside class="sidebar">
             <!-- Filters -->
-            <div class="controls collapsible">
+            <div class="controls collapsible collapsed">
               <h3 class="collapsible-header" data-target="search-content">
                 <span>Filters</span>
                 <span class="collapse-icon">▼</span>
@@ -80,23 +80,12 @@
                   </div>
 
                   <div class="filter-group">
-                    <label class="filter-label">
-                      <input type="checkbox" id="group-weapons" checked />
-                      Group weapon tiers (show only highest)
+                    <label class="filter-label checkbox-label">
+                      <input type="checkbox" id="cosmetics-toggle" class="filter-checkbox">
+                      <span>Show Cosmetics</span>
                     </label>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Location Filter -->
-            <div class="controls collapsible">
-              <h3 class="collapsible-header" data-target="zone-filter-content">
-                <span>Location</span>
-                <span class="collapse-icon">▼</span>
-              </h3>
-              <div class="collapsible-content" id="zone-filter-content">
-                <div id="zone-filter-container"></div>
               </div>
             </div>
 
@@ -108,6 +97,17 @@
               </h3>
               <div class="collapsible-content" id="workshop-content">
                 <div class="workshop-grid" id="workshop-grid"></div>
+              </div>
+            </div>
+
+            <!-- Location Filter -->
+            <div class="controls collapsible">
+              <h3 class="collapsible-header" data-target="zone-filter-content">
+                <span>Location</span>
+                <span class="collapse-icon">▼</span>
+              </h3>
+              <div class="collapsible-content" id="zone-filter-content">
+                <div id="zone-filter-container"></div>
               </div>
             </div>
           </aside>

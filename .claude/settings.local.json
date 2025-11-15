@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npm run fetch-data:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(curl:*)",
+      "Bash(d:/WebProjects/ArcRaidersLootList/temp_subcategories.json)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

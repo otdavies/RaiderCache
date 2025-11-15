@@ -1,5 +1,5 @@
 export interface WorkshopRequirement {
-  itemId: string;
+  item_id: string;
   quantity: number;
 }
 

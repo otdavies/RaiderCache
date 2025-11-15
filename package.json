@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "fuse.js": "^7.0.0",
+    "leaflet": "^1.9.4",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20.11.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",

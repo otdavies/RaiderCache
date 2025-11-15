@@ -9,19 +9,19 @@
         "name": "Foundation",
         "requirementItemIds": [
           {
-            "itemId": "metal_parts",
+            "item_id": "metal-parts",
             "quantity": 150
           },
           {
-            "itemId": "rubber_parts",
+            "item_id": "rubber-parts-recipe",
             "quantity": 200
           },
           {
-            "itemId": "arc_alloy",
+            "item_id": "arc-alloy",
             "quantity": 80
           },
           {
-            "itemId": "steel_spring",
+            "item_id": "spring",
             "quantity": 15
           }
         ]
@@ -51,19 +51,19 @@
         },
         "requirementItemIds": [
           {
-            "itemId": "durable_cloth",
+            "item_id": "durable-cloth",
             "quantity": 35
           },
           {
-            "itemId": "wires",
+            "item_id": "wires-recipe",
             "quantity": 30
           },
           {
-            "itemId": "electrical_components",
+            "item_id": "electrical-components",
             "quantity": 30
           },
           {
-            "itemId": "cooling_fan",
+            "item_id": "cooling-fan",
             "quantity": 5
           }
         ]
@@ -93,19 +93,19 @@
         },
         "requirementItemIds": [
           {
-            "itemId": "light_bulb",
+            "item_id": "light-bulb",
             "quantity": 5
           },
           {
-            "itemId": "battery",
+            "item_id": "battery",
             "quantity": 30
           },
           {
-            "itemId": "sensors",
+            "item_id": "sensors-recipe",
             "quantity": 20
           },
           {
-            "itemId": "exodus_modules",
+            "item_id": "exodus-modules",
             "quantity": 1
           }
         ]
@@ -135,19 +135,19 @@
         },
         "requirementItemIds": [
           {
-            "itemId": "humidifier",
+            "item_id": "humidifier",
             "quantity": 5
           },
           {
-            "itemId": "advanced_electrical_components",
+            "item_id": "advanced-electrical-components",
             "quantity": 5
           },
           {
-            "itemId": "magnetic_accelerator",
+            "item_id": "magnetic-accelerator",
             "quantity": 3
           },
           {
-            "itemId": "leaper_pulse_unit",
+            "item_id": "leaper-pulse-unit",
             "quantity": 3
           }
         ]

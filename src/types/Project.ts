@@ -1,5 +1,5 @@
 export interface ProjectRequirement {
-  itemId: string;
+  item_id: string;
   quantity: number;
 }
 

@@ -1,9 +1,8 @@
 import './styles/main.css';
 import { dataLoader, type GameData } from './utils/dataLoader';
 import { DecisionEngine } from './utils/decisionEngine';
-import { SearchEngine, type SearchableItem } from './utils/searchEngine';
+import { SearchEngine, type SearchableItem, isCosmetic } from './utils/searchEngine';
 import { StorageManager } from './utils/storage';
-import { WeaponGrouper } from './utils/weaponGrouping';
 import type { UserProgress } from './types/UserProgress';
 import type { Item, RecycleDecision } from './types/Item';
 import { ItemCard } from './components/ItemCard';
@@ -28,7 +27,7 @@ class App {
     rarities: new Set<string>(),
     category: '',
     zones: [] as string[],
-    groupWeapons: true,
+    showCosmetics: false,
     sortBy: 'name' as 'name' | 'value' | 'rarity' | 'weight' | 'decision',
     sortDirection: 'asc' as 'asc' | 'desc'
   };
@@ -108,6 +107,7 @@ class App {
     this.initializeDecisionFilters();
     this.initializeRarityFilters();
     this.initializeCategoryFilter();
+    this.initializeCosmeticsToggle();
     this.initializeSortSelector();
 
     // Initialize dashboard
@@ -200,15 +200,16 @@ class App {
       this.filters.category = (e.target as HTMLSelectElement).value;
       this.applyFilters();
     });
+  }
 
-    // Weapon grouping checkbox
-    const groupWeaponsCheckbox = document.getElementById('group-weapons') as HTMLInputElement;
-    if (groupWeaponsCheckbox) {
-      groupWeaponsCheckbox.addEventListener('change', (e) => {
-        this.filters.groupWeapons = (e.target as HTMLInputElement).checked;
-        this.applyFilters();
-      });
-    }
+  private initializeCosmeticsToggle() {
+    const checkbox = document.getElementById('cosmetics-toggle') as HTMLInputElement;
+    if (!checkbox) return;
+
+    checkbox.addEventListener('change', (e) => {
+      this.filters.showCosmetics = (e.target as HTMLInputElement).checked;
+      this.applyFilters();
+    });
   }
 
   private initializeSortSelector() {
@@ -379,6 +380,11 @@ class App {
       items = this.searchEngine.search(this.filters.searchQuery);
     }
 
+    // Cosmetics filter
+    if (!this.filters.showCosmetics) {
+      items = items.filter(item => !isCosmetic(item));
+    }
+
     // Decision filter
     if (this.filters.decisions.size > 0) {
       items = items.filter(item =>
@@ -405,11 +411,6 @@ class App {
         // Item must be found in at least one of the selected zones
         return item.foundIn.some(zone => this.filters.zones.includes(zone));
       });
-    }
-
-    // Weapon grouping - show only highest tier of each weapon
-    if (this.filters.groupWeapons) {
-      items = WeaponGrouper.filterToHighestTiers(items);
     }
 
     // Sort items
