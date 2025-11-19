@@ -111,5 +111,3 @@ All Arc Raiders game content © Embark Studios AB.
 - Embark Studios for creating Arc Raiders
 
 ---
-
-Made with ⚡ for the Arc Raiders community
