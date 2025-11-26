@@ -673,7 +673,8 @@ async function calculateMapExtents(): Promise<void> {
     'dam': 256,
     'spaceport': 512,
     'buried-city': 512,
-    'blue-gate': 512
+    'blue-gate': 512,
+    'stella-montis': 512
   };
 
   const mapDirs = fs.readdirSync(TILES_DIR).filter(f =>
