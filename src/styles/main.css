@@ -699,6 +699,42 @@ body {
   color: var(--color-bg-dark);
 }
 
+/* Language Selector */
+.lang-select {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-dark);
+  border: 1px solid var(--color-bg-elevated);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.lang-select:hover,
+.lang-select:focus {
+  border-color: var(--color-accent-cyan);
+}
+
+/* Profile Button */
+.profile-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-dark);
+  border: 1px solid var(--color-bg-elevated);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.profile-btn:hover {
+  border-color: var(--color-accent-cyan);
+  background: var(--color-bg-elevated);
+}
+
 .items-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -2465,5 +2501,80 @@ body {
   .map-badge {
     font-size: 0.8rem;
     padding: var(--spacing-xs) var(--spacing-md);
+  }
+}
+
+/* ========================================
+   Quests Button (Sidebar)
+   ======================================== */
+
+.quests-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg-elevated);
+  border: 1px solid rgba(0, 188, 212, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.quests-btn:hover {
+  background: var(--color-bg-card);
+  border-color: var(--color-accent-cyan);
+  box-shadow: 0 0 12px rgba(0, 188, 212, 0.3);
+}
+
+.quests-btn:active {
+  transform: scale(0.98);
+}
+
+/* ========================================
+   Floating Language Selector
+   ======================================== */
+
+.floating-lang-selector {
+  position: fixed;
+  bottom: var(--spacing-lg);
+  right: var(--spacing-lg);
+  z-index: 1000;
+}
+
+.floating-lang-selector .lang-select {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid rgba(0, 188, 212, 0.4);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-md);
+}
+
+.floating-lang-selector .lang-select:hover {
+  border-color: var(--color-accent-cyan);
+  box-shadow: 0 0 12px rgba(0, 188, 212, 0.3);
+}
+
+.floating-lang-selector .lang-select:focus {
+  outline: none;
+  border-color: var(--color-accent-cyan);
+}
+
+@media (max-width: 768px) {
+  .floating-lang-selector {
+    bottom: var(--spacing-md);
+    right: var(--spacing-md);
   }
 }

@@ -2,6 +2,7 @@ import type { Item } from '../types/Item';
 import type { HideoutModule } from '../types/HideoutModule';
 import type { Quest } from '../types/Quest';
 import type { Project } from '../types/Project';
+import type { TranslationData } from './translationEngine';
 
 export interface GameData {
   items: Item[];
@@ -189,6 +190,13 @@ export class DataLoader {
     }
 
     return this.getPath(`assets/icons/${item.imageFilename}`);
+  }
+
+  /**
+   * Load translations data
+   */
+  async loadTranslations(): Promise<TranslationData> {
+    return this.fetchJSON<TranslationData>(this.getPath('data/translations.json'));
   }
 
   /**

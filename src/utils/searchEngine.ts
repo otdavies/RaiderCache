@@ -22,12 +22,28 @@ export function isCosmetic(item: Item): boolean {
 
 export class SearchEngine {
   private fuse: Fuse<SearchableItem>;
+  private items: SearchableItem[];
+  private currentLanguage: string;
 
-  constructor(items: SearchableItem[]) {
-    this.fuse = new Fuse(items, {
+  constructor(items: SearchableItem[], language: string = 'en') {
+    this.items = items;
+    this.currentLanguage = language;
+    this.fuse = this.createFuseInstance(items, language);
+  }
+
+  private createFuseInstance(items: SearchableItem[], language: string): Fuse<SearchableItem> {
+    // Build searchable items with language-specific names
+    const searchableItems = items.map(item => ({
+      ...item,
+      _searchName: this.getItemName(item, language),
+      _searchDescription: this.getItemDescription(item, language)
+    }));
+
+    return new Fuse(searchableItems, {
       keys: [
-        { name: 'name', weight: 2 }, // Now just 'name' (English only)
-        { name: 'description', weight: 1 }, // Now just 'description' (English only)
+        { name: '_searchName', weight: 2 },
+        { name: 'name', weight: 1.5 }, // Fallback to original name
+        { name: '_searchDescription', weight: 1 },
         { name: 'type', weight: 1.5 },
         { name: 'id', weight: 0.5 }
       ],
@@ -35,6 +51,30 @@ export class SearchEngine {
       includeScore: true,
       useExtendedSearch: true
     });
+  }
+
+  private getItemName(item: Item, language: string): string {
+    if (typeof item.name === 'object' && item.name !== null) {
+      return (item.name as Record<string, string>)[language] || (item.name as Record<string, string>)['en'] || '';
+    }
+    return item.name || '';
+  }
+
+  private getItemDescription(item: Item, language: string): string {
+    if (typeof item.description === 'object' && item.description !== null) {
+      return (item.description as Record<string, string>)[language] || (item.description as Record<string, string>)['en'] || '';
+    }
+    return item.description || '';
+  }
+
+  /**
+   * Set the current language and rebuild the index
+   */
+  setLanguage(language: string): void {
+    if (language !== this.currentLanguage) {
+      this.currentLanguage = language;
+      this.fuse = this.createFuseInstance(this.items, language);
+    }
   }
 
   /**
@@ -53,6 +93,7 @@ export class SearchEngine {
    * Update search index with new items
    */
   updateIndex(items: SearchableItem[]): void {
-    this.fuse.setCollection(items);
+    this.items = items;
+    this.fuse = this.createFuseInstance(items, this.currentLanguage);
   }
 }

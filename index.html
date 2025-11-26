@@ -110,6 +110,13 @@
                 <div id="zone-filter-container"></div>
               </div>
             </div>
+
+            <!-- Quests Button -->
+            <div class="controls">
+              <button class="quests-btn" id="quests-btn">
+                <span>Quests</span>
+              </button>
+            </div>
           </aside>
 
           <!-- Main Content Area -->
@@ -129,12 +136,23 @@
         <p class="update-info">Last updated: <span id="last-update">Loading...</span></p>
       </div>
     </footer>
+
+    <!-- Floating Language Selector -->
+    <div class="floating-lang-selector">
+      <select id="lang-selector" class="lang-select"></select>
+    </div>
   </div>
 
   <!-- Item Detail Modal -->
   <div class="modal" id="item-modal">
     <div class="modal-overlay"></div>
     <div class="modal-content"></div>
+  </div>
+
+  <!-- Profile/Settings Modal -->
+  <div class="modal" id="profile-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content profile-modal-content"></div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>

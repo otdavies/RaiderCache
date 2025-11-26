@@ -8,6 +8,9 @@ import type { Item, RecycleDecision } from './types/Item';
 import { ItemCard } from './components/ItemCard';
 import { ItemModal } from './components/ItemModal';
 import { ZoneFilter } from './components/ZoneFilter';
+import { ProfileModal } from './components/ProfileModal';
+import { initializeTranslationEngine, translationEngine, SUPPORTED_LANGUAGES, type SupportedLanguage } from './utils/translationEngine';
+import { initializeI18n, updateAllTranslations } from './utils/i18n';
 
 class App {
   private gameData!: GameData;
@@ -17,6 +20,7 @@ class App {
   private allItems: SearchableItem[] = [];
   private filteredItems: SearchableItem[] = [];
   private zoneFilter!: ZoneFilter;
+  private profileModal!: ProfileModal;
 
   private searchInput!: HTMLInputElement;
   private itemsGrid!: HTMLElement;
@@ -41,6 +45,10 @@ class App {
       // Show loading state
       this.showLoading();
 
+      // Initialize translation engine first
+      await initializeTranslationEngine();
+      initializeI18n();
+
       // Load game data
       this.gameData = await dataLoader.loadGameData();
 
@@ -55,8 +63,8 @@ class App {
       // Get items with decisions
       this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
 
-      // Initialize search engine
-      this.searchEngine = new SearchEngine(this.allItems);
+      // Initialize search engine with current language
+      this.searchEngine = new SearchEngine(this.allItems, translationEngine.getCurrentLanguage());
 
       // Set filtered items to all items initially
       this.filteredItems = [...this.allItems];
@@ -121,6 +129,12 @@ class App {
 
     // Initialize zone filter
     this.initializeZoneFilter();
+
+    // Initialize language selector
+    this.initializeLanguageSelector();
+
+    // Initialize profile modal
+    this.initializeProfileModal();
   }
 
   private initializeDecisionFilters() {
@@ -370,6 +384,67 @@ class App {
     if (zoneFilterContainer) {
       this.zoneFilter.mount(zoneFilterContainer);
     }
+  }
+
+  private initializeLanguageSelector() {
+    const langSelector = document.getElementById('lang-selector') as HTMLSelectElement;
+    if (!langSelector) return;
+
+    // Populate language options
+    SUPPORTED_LANGUAGES.forEach(lang => {
+      const option = document.createElement('option');
+      option.value = lang;
+      option.textContent = lang.toUpperCase();
+      if (lang === translationEngine.getCurrentLanguage()) {
+        option.selected = true;
+      }
+      langSelector.appendChild(option);
+    });
+
+    langSelector.addEventListener('change', (e) => {
+      const newLang = (e.target as HTMLSelectElement).value as SupportedLanguage;
+      this.handleLanguageChange(newLang);
+    });
+  }
+
+  private handleLanguageChange(lang: SupportedLanguage) {
+    translationEngine.setLanguage(lang);
+    // Update search engine language
+    this.searchEngine.setLanguage(lang);
+    // Update all DOM translations
+    updateAllTranslations();
+    // Re-render items
+    this.render();
+    // Update profile modal if it exists
+    if (this.profileModal) {
+      this.profileModal.updateState(
+        this.userProgress,
+        this.gameData.quests
+      );
+    }
+  }
+
+  private initializeProfileModal() {
+    const questsBtn = document.getElementById('quests-btn');
+    if (!questsBtn) return;
+
+    this.profileModal = new ProfileModal({
+      quests: this.gameData.quests,
+      userProgress: this.userProgress,
+      onSave: (progress) => {
+        this.userProgress = progress;
+        StorageManager.saveUserProgress(progress);
+        // Recalculate decisions
+        this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
+        this.searchEngine.updateIndex(this.allItems);
+        this.applyFilters();
+        this.updateStats();
+      }
+    });
+
+    questsBtn.addEventListener('click', () => {
+      this.profileModal.show();
+    });
   }
 
   private applyFilters() {
