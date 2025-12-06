@@ -433,6 +433,75 @@ body {
   box-shadow: 0 0 15px rgba(0, 188, 212, 0.4);
 }
 
+/* Category Filter - Three State Toggle */
+.filter-group--category {
+  width: 100%;
+}
+
+.filter-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-xs);
+}
+
+.category-reset-btn {
+  padding: 2px 8px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.category-reset-btn:hover {
+  border-color: var(--color-accent-orange);
+  color: var(--color-accent-orange);
+}
+
+.filter-buttons--category {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.category-btn {
+  font-size: 0.6rem;
+  padding: 3px 6px;
+}
+
+/* Include state: cyan with + prefix */
+.category-btn[data-state="include"] {
+  background: rgba(0, 188, 212, 0.15);
+  border-color: var(--color-accent-cyan);
+  color: var(--color-accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 188, 212, 0.3);
+}
+
+.category-btn[data-state="include"]::before {
+  content: '+ ';
+  font-weight: bold;
+}
+
+/* Exclude state: orange with strikethrough and - prefix */
+.category-btn[data-state="exclude"] {
+  background: rgba(255, 107, 53, 0.15);
+  border-color: var(--color-accent-orange);
+  color: var(--color-accent-orange);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.category-btn[data-state="exclude"]::before {
+  content: '− ';
+  font-weight: bold;
+  text-decoration: none;
+}
+
 .filter-select {
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-dark);
@@ -528,8 +597,79 @@ body {
 .sidebar {
   position: sticky;
   top: 80px;
-  width: 200px;
+  width: 220px;
   flex-shrink: 0;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-bg-elevated);
+}
+
+/* Sidebar Tabs */
+.sidebar-tabs {
+  display: flex;
+  background: var(--color-bg-dark);
+  border-bottom: 1px solid var(--color-bg-elevated);
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-tab:hover {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sidebar-tab.active {
+  color: var(--color-accent-cyan);
+  border-bottom-color: var(--color-accent-cyan);
+  background: rgba(0, 188, 212, 0.05);
+}
+
+/* Sidebar Panels */
+.sidebar-panels {
+  position: relative;
+}
+
+.sidebar-panel {
+  display: none;
+  padding: var(--spacing-md);
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+
+.sidebar-panel.active {
+  display: block;
+}
+
+/* Custom scrollbar for panels */
+.sidebar-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-panel::-webkit-scrollbar-track {
+  background: var(--color-bg-dark);
+}
+
+.sidebar-panel::-webkit-scrollbar-thumb {
+  background: var(--color-bg-elevated);
+  border-radius: 2px;
+}
+
+.sidebar-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
 }
 
 .main-content {
@@ -2138,19 +2278,19 @@ body {
 .zone-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
 }
 
 .zone-btn {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 4px 8px;
   background: var(--color-bg-dark);
   border: 2px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -2174,7 +2314,6 @@ body {
 .zone-btn:hover:not(:disabled) {
   border-color: var(--zone-color);
   background: color-mix(in srgb, var(--zone-color) 10%, var(--color-bg-dark));
-  transform: translateX(2px);
 }
 
 .zone-btn:hover::before {
@@ -2185,7 +2324,7 @@ body {
 .zone-btn--selected {
   border-color: var(--zone-color);
   background: color-mix(in srgb, var(--zone-color) 15%, var(--color-bg-dark));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--zone-color) 25%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--zone-color) 25%, transparent);
 }
 
 .zone-btn--selected::before {
@@ -2207,11 +2346,11 @@ body {
 .zone-btn__count {
   background: var(--zone-color);
   color: white;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 0.6rem;
   font-weight: 700;
-  min-width: 24px;
+  min-width: 20px;
   text-align: center;
 }
 

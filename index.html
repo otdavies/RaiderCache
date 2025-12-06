@@ -52,15 +52,24 @@
     <main class="main">
       <div class="container">
         <div class="layout-wrapper">
-          <!-- Sidebar with Filters and Workshop Progress -->
+          <!-- Sidebar with Tabbed Interface -->
           <aside class="sidebar">
-            <!-- Filters -->
-            <div class="controls collapsible collapsed">
-              <h3 class="collapsible-header" data-target="search-content">
-                <span>Filters</span>
-                <span class="collapse-icon">▼</span>
-              </h3>
-              <div class="collapsible-content" id="search-content">
+            <!-- Tab Navigation -->
+            <div class="sidebar-tabs">
+              <button class="sidebar-tab" data-tab="hideout">Hideout</button>
+              <button class="sidebar-tab" data-tab="filters">Filters</button>
+              <button class="sidebar-tab" data-tab="location">Location</button>
+            </div>
+
+            <!-- Tab Panels -->
+            <div class="sidebar-panels">
+              <!-- Hideout Panel -->
+              <div class="sidebar-panel" id="panel-hideout">
+                <div class="workshop-grid" id="workshop-grid"></div>
+              </div>
+
+              <!-- Filters Panel -->
+              <div class="sidebar-panel" id="panel-filters">
                 <div class="filters" id="filters">
                   <div class="filter-group">
                     <label class="filter-label">Decision:</label>
@@ -72,41 +81,19 @@
                     <div class="filter-buttons" id="rarity-filter"></div>
                   </div>
 
-                  <div class="filter-group">
-                    <label class="filter-label">Category:</label>
-                    <select id="category-filter" class="filter-select">
-                      <option value="">All Categories</option>
-                    </select>
+                  <div class="filter-group filter-group--category">
+                    <div class="filter-label-row">
+                      <label class="filter-label">Category:</label>
+                      <button class="category-reset-btn" id="category-reset">Reset</button>
+                    </div>
+                    <div class="filter-buttons filter-buttons--category" id="category-filter"></div>
                   </div>
 
-                  <div class="filter-group">
-                    <label class="filter-label checkbox-label">
-                      <input type="checkbox" id="cosmetics-toggle" class="filter-checkbox">
-                      <span>Show Cosmetics</span>
-                    </label>
-                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Workshop Progress -->
-            <div class="controls collapsible">
-              <h3 class="collapsible-header" data-target="workshop-content">
-                <span>Hideout Progress</span>
-                <span class="collapse-icon">▼</span>
-              </h3>
-              <div class="collapsible-content" id="workshop-content">
-                <div class="workshop-grid" id="workshop-grid"></div>
-              </div>
-            </div>
-
-            <!-- Location Filter -->
-            <div class="controls collapsible">
-              <h3 class="collapsible-header" data-target="zone-filter-content">
-                <span>Location</span>
-                <span class="collapse-icon">▼</span>
-              </h3>
-              <div class="collapsible-content" id="zone-filter-content">
+              <!-- Location Panel -->
+              <div class="sidebar-panel" id="panel-location">
                 <div id="zone-filter-container"></div>
               </div>
             </div>

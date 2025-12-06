@@ -3,8 +3,11 @@ import { DEFAULT_USER_PROGRESS } from '../types/UserProgress';
 
 const STORAGE_KEYS = {
   USER_PROGRESS: 'arc_raiders_user_progress',
-  FAVORITES: 'arc_raiders_favorites'
+  FAVORITES: 'arc_raiders_favorites',
+  CATEGORY_FILTERS: 'arc_raiders_category_filters'
 } as const;
+
+export type CategoryFilterState = Record<string, 'include' | 'exclude'>;
 
 export class StorageManager {
   /**
@@ -124,5 +127,33 @@ export class StorageManager {
     }
     this.saveFavorites(favorites);
     return favorites.has(itemId);
+  }
+
+  /**
+   * Load category filters from localStorage
+   */
+  static loadCategoryFilters(): Map<string, 'include' | 'exclude'> {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CATEGORY_FILTERS);
+      if (stored) {
+        const parsed = JSON.parse(stored) as CategoryFilterState;
+        return new Map(Object.entries(parsed));
+      }
+    } catch (error) {
+      console.error('Failed to load category filters:', error);
+    }
+    return new Map();
+  }
+
+  /**
+   * Save category filters to localStorage
+   */
+  static saveCategoryFilters(filters: Map<string, 'include' | 'exclude'>): void {
+    try {
+      const obj: CategoryFilterState = Object.fromEntries(filters);
+      localStorage.setItem(STORAGE_KEYS.CATEGORY_FILTERS, JSON.stringify(obj));
+    } catch (error) {
+      console.error('Failed to save category filters:', error);
+    }
   }
 }

@@ -1,7 +1,7 @@
 import './styles/main.css';
 import { dataLoader, type GameData } from './utils/dataLoader';
 import { DecisionEngine } from './utils/decisionEngine';
-import { SearchEngine, type SearchableItem, isCosmetic } from './utils/searchEngine';
+import { SearchEngine, type SearchableItem } from './utils/searchEngine';
 import { StorageManager } from './utils/storage';
 import type { UserProgress } from './types/UserProgress';
 import type { Item, RecycleDecision } from './types/Item';
@@ -25,9 +25,8 @@ class App {
     searchQuery: '',
     decisions: new Set<RecycleDecision>(),
     rarities: new Set<string>(),
-    category: '',
+    categories: new Map<string, 'include' | 'exclude'>(),
     zones: [] as string[],
-    showCosmetics: false,
     sortBy: 'name' as 'name' | 'value' | 'rarity' | 'weight' | 'decision',
     sortDirection: 'asc' as 'asc' | 'desc'
   };
@@ -54,6 +53,10 @@ class App {
 
       // Get items with decisions
       this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
+
+      // Filter out blacklisted garbage items
+      const itemBlacklist = ['refinement-1'];
+      this.allItems = this.allItems.filter(item => !itemBlacklist.includes(item.id));
 
       // Initialize search engine
       this.searchEngine = new SearchEngine(this.allItems);
@@ -107,7 +110,6 @@ class App {
     this.initializeDecisionFilters();
     this.initializeRarityFilters();
     this.initializeCategoryFilter();
-    this.initializeCosmeticsToggle();
     this.initializeSortSelector();
 
     // Initialize dashboard
@@ -182,34 +184,106 @@ class App {
     });
   }
 
-  private initializeCategoryFilter() {
-    const select = document.getElementById('category-filter') as HTMLSelectElement;
-    if (!select) return;
+  // Normalize category names to handle case variations and similar names
+  private normalizeCategory(type: string): string {
+    const normalized = type.trim();
+    const lower = normalized.toLowerCase();
 
-    // Get unique categories
-    const categories = new Set(this.allItems.map(item => item.type));
+    // Map similar/variant names to canonical forms
+    const categoryMap: Record<string, string> = {
+      'quick use': 'Quick Use',
+      'quick_use': 'Quick Use',
+      'consumable': 'Quick Use',
+      'medical': 'Quick Use',
+      'throwable': 'Quick Use',
+      'mods': 'Modification',
+      'mod': 'Modification',
+      'modifications': 'Modification',
+      'material': 'Basic Material',
+      'quest item': 'Quest Item',
+      'quest_item': 'Quest Item',
+      'questitem': 'Quest Item',
+    };
 
-    categories.forEach(category => {
-      const option = document.createElement('option');
-      option.value = category;
-      option.textContent = category;
-      select.appendChild(option);
-    });
-
-    select.addEventListener('change', (e) => {
-      this.filters.category = (e.target as HTMLSelectElement).value;
-      this.applyFilters();
-    });
+    return categoryMap[lower] || normalized;
   }
 
-  private initializeCosmeticsToggle() {
-    const checkbox = document.getElementById('cosmetics-toggle') as HTMLInputElement;
-    if (!checkbox) return;
+  // Get the normalized category for an item
+  private getItemCategory(item: { type: string }): string {
+    return this.normalizeCategory(item.type);
+  }
 
-    checkbox.addEventListener('change', (e) => {
-      this.filters.showCosmetics = (e.target as HTMLInputElement).checked;
+  private initializeCategoryFilter() {
+    const container = document.getElementById('category-filter');
+    const resetBtn = document.getElementById('category-reset');
+    if (!container) return;
+
+    // Load saved category filters
+    const savedFilters = StorageManager.loadCategoryFilters();
+    const hasExistingSave = savedFilters.size > 0;
+    this.filters.categories = savedFilters;
+
+    // Default excludes for new users (no saved state)
+    const defaultExcludes = ['Blueprint', 'Cosmetic', 'Misc'];
+
+    // Get unique normalized categories sorted alphabetically
+    const categories = [...new Set(this.allItems.map(item => this.getItemCategory(item)))].sort();
+
+    // Create toggle buttons for each category
+    categories.forEach(category => {
+      const button = document.createElement('button');
+      button.className = 'filter-btn category-btn';
+      button.dataset.category = category;
+
+      // Apply saved state, or default excludes for new users, or neutral
+      let state: 'neutral' | 'include' | 'exclude' = 'neutral';
+      if (hasExistingSave) {
+        state = this.filters.categories.get(category) || 'neutral';
+      } else if (defaultExcludes.includes(category)) {
+        state = 'exclude';
+        this.filters.categories.set(category, 'exclude');
+      }
+      button.dataset.state = state;
+      button.textContent = category;
+
+      button.addEventListener('click', () => {
+        const currentState = button.dataset.state;
+        let newState: 'neutral' | 'include' | 'exclude';
+
+        // Cycle: neutral -> include -> exclude -> neutral
+        if (currentState === 'neutral') {
+          newState = 'include';
+          this.filters.categories.set(category, 'include');
+        } else if (currentState === 'include') {
+          newState = 'exclude';
+          this.filters.categories.set(category, 'exclude');
+        } else {
+          newState = 'neutral';
+          this.filters.categories.delete(category);
+        }
+
+        button.dataset.state = newState;
+        StorageManager.saveCategoryFilters(this.filters.categories);
+        this.applyFilters();
+      });
+
+      container.appendChild(button);
+    });
+
+    // Reset button clears all category filters
+    resetBtn?.addEventListener('click', () => {
+      this.filters.categories.clear();
+      StorageManager.saveCategoryFilters(this.filters.categories);
+      container.querySelectorAll('.category-btn').forEach(btn => {
+        (btn as HTMLElement).dataset.state = 'neutral';
+      });
       this.applyFilters();
     });
+
+    // Apply saved filters on load
+    if (this.filters.categories.size > 0) {
+      this.applyFilters();
+    }
   }
 
   private initializeSortSelector() {
@@ -380,11 +454,6 @@ class App {
       items = this.searchEngine.search(this.filters.searchQuery);
     }
 
-    // Cosmetics filter
-    if (!this.filters.showCosmetics) {
-      items = items.filter(item => !isCosmetic(item));
-    }
-
     // Decision filter
     if (this.filters.decisions.size > 0) {
       items = items.filter(item =>
@@ -399,9 +468,23 @@ class App {
       );
     }
 
-    // Category filter
-    if (this.filters.category) {
-      items = items.filter(item => item.type === this.filters.category);
+    // Category filter (three-state: include takes priority over exclude)
+    // Uses normalized categories for case-insensitive and fuzzy matching
+    if (this.filters.categories.size > 0) {
+      const included = [...this.filters.categories.entries()]
+        .filter(([_, state]) => state === 'include')
+        .map(([cat]) => cat);
+      const excluded = [...this.filters.categories.entries()]
+        .filter(([_, state]) => state === 'exclude')
+        .map(([cat]) => cat);
+
+      if (included.length > 0) {
+        // Include mode: show ONLY included categories
+        items = items.filter(item => included.includes(this.getItemCategory(item)));
+      } else if (excluded.length > 0) {
+        // Exclude mode: hide excluded categories
+        items = items.filter(item => !excluded.includes(this.getItemCategory(item)));
+      }
     }
 
     // Zone filter
@@ -557,15 +640,33 @@ class App {
 const app = new App();
 app.init();
 
-// Collapsible sections functionality
+// Sidebar tab switching functionality
 document.addEventListener('DOMContentLoaded', () => {
-  const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
+  const tabs = document.querySelectorAll('.sidebar-tab');
+  const panels = document.querySelectorAll('.sidebar-panel');
+  const STORAGE_KEY = 'arc-raiders-sidebar-tab';
 
-  collapsibleHeaders.forEach(header => {
-    header.addEventListener('click', () => {
-      const parent = header.closest('.collapsible');
-      if (parent) {
-        parent.classList.toggle('collapsed');
+  // Helper to activate a tab
+  const activateTab = (tabName: string) => {
+    tabs.forEach(t => {
+      t.classList.toggle('active', (t as HTMLElement).dataset.tab === tabName);
+    });
+    panels.forEach(panel => {
+      panel.classList.toggle('active', panel.id === `panel-${tabName}`);
+    });
+  };
+
+  // Load saved tab or default to 'hideout'
+  const savedTab = localStorage.getItem(STORAGE_KEY) || 'hideout';
+  activateTab(savedTab);
+
+  // Tab click handlers
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetTab = (tab as HTMLElement).dataset.tab;
+      if (targetTab) {
+        activateTab(targetTab);
+        localStorage.setItem(STORAGE_KEY, targetTab);
       }
     });
   });
