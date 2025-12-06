@@ -1,12 +1,12 @@
-# Arc Raiders Loot List
+# RaiderCache
 
-Interactive loot decision tool for Arc Raiders - quickly determine what to keep, recycle, or sell.
+Interactive loot decision tool for Arc Raiders - quickly determine what to keep or sell.
 
 ![Arc Raiders Logo](https://img.shields.io/badge/Arc%20Raiders-Loot%20Tool-00bcd4?style=for-the-badge)
 ![Build Status](https://img.shields.io/github/actions/workflow/status/otdavies/RaiderCache/deploy.yml?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
-## 🚀 Quick Start
+## Quick Start
 
 Visit the live app: [https://otdavies.github.io/RaiderCache/](https://otdavies.github.io/RaiderCache/)
 
@@ -29,14 +29,14 @@ npm run build
 npm run preview
 ```
 
-## 📊 Data Sources
+## Data Sources
 
 This tool uses data from multiple sources:
 - **[MetaForge API](https://metaforge.app/arc-raiders)** - Primary live data source for items, quests, and icons
 - **Local Static Files** - Hideout modules and projects (updated manually as needed)
 - Item data and icons are auto-updated daily via GitHub Actions
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **TypeScript** - Type safety and better maintainability
 - **Vite** - Fast build tool and dev server
@@ -45,7 +45,7 @@ This tool uses data from multiple sources:
 - **GitHub Pages** - Free hosting
 - **GitHub Actions** - Automated data updates
 
-## 📖 How It Works
+## How It Works
 
 ### Decisions
 
@@ -66,7 +66,7 @@ The app analyzes each item based on:
 - Validates data integrity before deployment
 - Automatically rebuilds and redeploys the app
 
-## 🎯 Usage Tips
+## Usage Tips
 
 1. **Set Your Hideout Levels** - Update the workshop tracker to get personalized recommendations
 2. **Use Filters** - Click decision badges to filter by Keep/Recycle/Sell
@@ -74,7 +74,7 @@ The app analyzes each item based on:
 4. **Click Items** - View detailed information, recipes, and locations
 5. **Bookmark Favorites** - Star items you want to track
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! If you find bugs or have suggestions:
 
@@ -82,16 +82,16 @@ Contributions are welcome! If you find bugs or have suggestions:
 2. Submit a pull request
 3. Report data inconsistencies
 
-## 📝 License
+## License
 
 MIT License - See [LICENSE](LICENSE) for details
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This is a community-created tool and is not affiliated with Embark Studios.
 All Arc Raiders game content © Embark Studios AB.
 
-## 🙏 Credits
+## Credits
 
 ### Data & Icons
 - **Primary Data Source**: [MetaForge API](https://metaforge.app/arc-raiders)
