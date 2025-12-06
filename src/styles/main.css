@@ -106,6 +106,18 @@ body {
   min-width: 0;
 }
 
+.github-link {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.github-link:hover {
+  opacity: 1;
+}
+
 .header-search {
   flex: 1;
   display: flex;
