@@ -403,15 +403,6 @@ class App {
         document.body.appendChild(overlay);
       }
 
-      // Create close button for modal
-      let closeBtn = sidebar.querySelector('.mobile-modal-close');
-      if (!closeBtn) {
-        closeBtn = document.createElement('button');
-        closeBtn.className = 'mobile-modal-close';
-        closeBtn.innerHTML = '×';
-        sidebar.insertBefore(closeBtn, sidebar.firstChild);
-      }
-
       const openModal = () => {
         sidebar.classList.add('mobile-modal');
         overlay!.classList.add('open');
@@ -425,7 +416,6 @@ class App {
 
       filtersBtn.addEventListener('click', openModal);
       overlay.addEventListener('click', closeModal);
-      closeBtn.addEventListener('click', closeModal);
     }
 
     // Sync mobile sort with desktop
