@@ -123,6 +123,9 @@ class App {
 
     // Initialize zone filter
     this.initializeZoneFilter();
+
+    // Initialize mobile menu
+    this.initializeMobileMenu();
   }
 
   private initializeDecisionFilters() {
@@ -362,6 +365,112 @@ class App {
           this.itemsGrid.classList.remove('list-view');
         }
       });
+    });
+  }
+
+  private initializeMobileMenu() {
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    const dropdown = document.getElementById('mobile-menu-dropdown');
+    const filtersBtn = document.getElementById('mobile-filters-btn');
+    const mobileSortSelect = document.getElementById('mobile-sort-selector') as HTMLSelectElement;
+    const mobileViewBtns = document.querySelectorAll('.mobile-view-btn');
+    const sidebar = document.querySelector('.sidebar');
+
+    if (!menuBtn || !dropdown) return;
+
+    // Toggle dropdown
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+      dropdown.classList.remove('open');
+    });
+
+    dropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Filters button - open sidebar as modal
+    if (filtersBtn && sidebar) {
+      // Create overlay if it doesn't exist
+      let overlay = document.querySelector('.sidebar-modal-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'sidebar-modal-overlay';
+        document.body.appendChild(overlay);
+      }
+
+      // Create close button for modal
+      let closeBtn = sidebar.querySelector('.mobile-modal-close');
+      if (!closeBtn) {
+        closeBtn = document.createElement('button');
+        closeBtn.className = 'mobile-modal-close';
+        closeBtn.innerHTML = '×';
+        sidebar.insertBefore(closeBtn, sidebar.firstChild);
+      }
+
+      const openModal = () => {
+        sidebar.classList.add('mobile-modal');
+        overlay!.classList.add('open');
+        dropdown.classList.remove('open');
+      };
+
+      const closeModal = () => {
+        sidebar.classList.remove('mobile-modal');
+        overlay!.classList.remove('open');
+      };
+
+      filtersBtn.addEventListener('click', openModal);
+      overlay.addEventListener('click', closeModal);
+      closeBtn.addEventListener('click', closeModal);
+    }
+
+    // Sync mobile sort with desktop
+    if (mobileSortSelect) {
+      const desktopSort = document.getElementById('sort-selector') as HTMLSelectElement;
+
+      mobileSortSelect.addEventListener('change', (e) => {
+        const value = (e.target as HTMLSelectElement).value;
+        this.filters.sortBy = value as any;
+        if (desktopSort) desktopSort.value = value;
+        this.applyFilters();
+      });
+    }
+
+    // Mobile view toggle
+    mobileViewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = (btn as HTMLElement).dataset.view;
+
+        mobileViewBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Sync with desktop toggle
+        const desktopBtns = document.querySelectorAll('.toggle-btn');
+        desktopBtns.forEach(b => {
+          b.classList.remove('active');
+          if ((b as HTMLElement).dataset.view === view) {
+            b.classList.add('active');
+          }
+        });
+
+        if (view === 'list') {
+          this.itemsGrid.classList.add('list-view');
+        } else {
+          this.itemsGrid.classList.remove('list-view');
+        }
+      });
+    });
+
+    // Set initial active state for mobile view buttons (always list on mobile)
+    mobileViewBtns.forEach(btn => {
+      btn.classList.remove('active');
+      if ((btn as HTMLElement).dataset.view === 'list') {
+        btn.classList.add('active');
+      }
     });
   }
 

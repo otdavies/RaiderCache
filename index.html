@@ -46,6 +46,28 @@
             <a href="https://github.com/otdavies/RaiderCache" target="_blank" rel="noopener" class="github-link" title="View on GitHub">
               <img src="https://cdn.simpleicons.org/github/white" alt="GitHub" width="20" height="20">
             </a>
+            <!-- Mobile menu -->
+            <div class="mobile-menu">
+              <button class="mobile-menu-btn" id="mobile-menu-btn" title="Menu">⋮</button>
+              <div class="mobile-menu-dropdown" id="mobile-menu-dropdown">
+                <button class="mobile-menu-item" id="mobile-filters-btn">Filters</button>
+                <div class="mobile-menu-divider"></div>
+                <div class="mobile-menu-item mobile-menu-sort">
+                  <label>Sort:</label>
+                  <select id="mobile-sort-selector" class="mobile-sort-select">
+                    <option value="name">Name</option>
+                    <option value="value">Value</option>
+                    <option value="rarity">Rarity</option>
+                    <option value="weight">Weight</option>
+                    <option value="decision">Decision</option>
+                  </select>
+                </div>
+                <div class="mobile-menu-item mobile-view-toggle">
+                  <button class="mobile-view-btn" data-view="grid" title="Grid view">▦</button>
+                  <button class="mobile-view-btn" data-view="list" title="List view">☰</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
