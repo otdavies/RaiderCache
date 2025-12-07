@@ -50,23 +50,11 @@ export class ZoneFilter {
     this.render();
   }
 
-  private handleClearAll(): void {
-    this.config.selectedZones = [];
-    this.config.onZoneSelect([]);
-    this.render();
-  }
-
   private render(): void {
     const zoneCounts = countItemsByZone(this.config.items);
     const allZones = Object.entries(zoneCounts).map(([name, count]) => ({ name, count }));
 
     this.container.innerHTML = `
-      ${this.config.selectedZones.length > 0 ? `
-        <button class="zone-clear-btn" id="clear-zones">
-          Clear (${this.config.selectedZones.length})
-        </button>
-      ` : ''}
-
       <div class="zone-list">
         ${allZones.map(({ name, count }) => this.renderZoneButton(name, count)).join('')}
       </div>
@@ -122,12 +110,6 @@ export class ZoneFilter {
         }
       });
     });
-
-    // Clear button
-    const clearBtn = this.container.querySelector('#clear-zones');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => this.handleClearAll());
-    }
   }
 
   public destroy(): void {
