@@ -2404,8 +2404,43 @@ body {
     display: block;
   }
 
+  /* Full width list items on mobile */
+  .main {
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  .main .container {
+    padding: 0;
+    max-width: 100%;
+  }
+
+  .layout-wrapper {
+    gap: 0;
+  }
+
+  .main-content {
+    width: 100%;
+  }
+
+  .items-section {
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
   .items-grid {
     grid-template-columns: 1fr;
+    gap: 1px;
+  }
+
+  .items-grid.list-view {
+    background: transparent;
+  }
+
+  .items-grid.list-view .item-card {
+    border-radius: 0;
   }
 
   .decision-dashboard {
