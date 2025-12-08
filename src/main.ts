@@ -8,6 +8,7 @@ import type { Item, RecycleDecision } from './types/Item';
 import { ItemCard } from './components/ItemCard';
 import { ItemModal } from './components/ItemModal';
 import { ZoneFilter } from './components/ZoneFilter';
+import { showPvPGateModal } from './components/PvPGateModal';
 
 class App {
   private gameData!: GameData;
@@ -735,9 +736,35 @@ class App {
   }
 }
 
-// Initialize app
-const app = new App();
-app.init();
+// Bootstrap with PvP gate check
+async function bootstrap() {
+  const REDDIT_URL = 'https://www.reddit.com/r/ArcRaiders/';
+  const answer = StorageManager.getPvPGateAnswer();
+
+  // Already answered 4-5: redirect
+  if (answer !== null && answer >= 4) {
+    window.location.href = REDDIT_URL;
+    return;
+  }
+
+  // Already answered 1-3: proceed
+  if (answer !== null && answer <= 3) {
+    new App().init();
+    return;
+  }
+
+  // No answer: show modal
+  const selected = await showPvPGateModal();
+  StorageManager.setPvPGateAnswer(selected);
+
+  if (selected >= 4) {
+    window.location.href = REDDIT_URL;
+  } else {
+    new App().init();
+  }
+}
+
+bootstrap();
 
 // Sidebar tab switching functionality
 document.addEventListener('DOMContentLoaded', () => {

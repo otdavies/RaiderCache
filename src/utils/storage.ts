@@ -4,7 +4,8 @@ import { DEFAULT_USER_PROGRESS } from '../types/UserProgress';
 const STORAGE_KEYS = {
   USER_PROGRESS: 'arc_raiders_user_progress',
   FAVORITES: 'arc_raiders_favorites',
-  CATEGORY_FILTERS: 'arc_raiders_category_filters'
+  CATEGORY_FILTERS: 'arc_raiders_category_filters',
+  PVP_GATE: 'arc_raiders_pvp_gate'
 } as const;
 
 export type CategoryFilterState = Record<string, 'include' | 'exclude'>;
@@ -154,6 +155,26 @@ export class StorageManager {
       localStorage.setItem(STORAGE_KEYS.CATEGORY_FILTERS, JSON.stringify(obj));
     } catch (error) {
       console.error('Failed to save category filters:', error);
+    }
+  }
+
+  static getPvPGateAnswer(): number | null {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.PVP_GATE);
+      if (stored) {
+        return JSON.parse(stored) as number;
+      }
+    } catch (error) {
+      console.error('Failed to load PvP gate answer:', error);
+    }
+    return null;
+  }
+
+  static setPvPGateAnswer(answer: number): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PVP_GATE, JSON.stringify(answer));
+    } catch (error) {
+      console.error('Failed to save PvP gate answer:', error);
     }
   }
 }

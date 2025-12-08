@@ -2845,3 +2845,153 @@ body {
     padding: var(--spacing-xs) var(--spacing-md);
   }
 }
+
+/* ========================================
+   PvP Gate Modal
+   ======================================== */
+
+#pvp-gate-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+#pvp-gate-modal.active {
+  display: flex;
+}
+
+.pvp-gate-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+}
+
+.pvp-gate-content {
+  position: relative;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-accent-cyan);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 0 40px rgba(6, 182, 212, 0.3);
+}
+
+.pvp-gate-title {
+  margin: 0 0 var(--spacing-md) 0;
+  font-size: 1.5rem;
+  color: var(--color-accent-cyan);
+  text-align: center;
+}
+
+.pvp-gate-question {
+  margin: 0 0 var(--spacing-lg) 0;
+  color: var(--color-text-primary);
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.pvp-gate-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.pvp-gate-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-bg-dark);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pvp-gate-option:hover {
+  border-color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
+}
+
+.pvp-gate-option:has(input:checked) {
+  border-color: var(--color-accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.pvp-gate-option input[type="radio"] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-text-muted);
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+}
+
+.pvp-gate-option input[type="radio"]:checked {
+  border-color: var(--color-accent-cyan);
+}
+
+.pvp-gate-option input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent-cyan);
+  border-radius: 50%;
+}
+
+.pvp-gate-option-text {
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+}
+
+.pvp-gate-submit {
+  width: 100%;
+  padding: var(--spacing-md);
+  background: var(--color-accent-cyan);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-bg-dark);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pvp-gate-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pvp-gate-submit:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-accent-cyan) 85%, white);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .pvp-gate-content {
+    padding: var(--spacing-lg);
+  }
+
+  .pvp-gate-title {
+    font-size: 1.25rem;
+  }
+
+  .pvp-gate-option {
+    padding: var(--spacing-sm);
+  }
+
+  .pvp-gate-option-text {
+    font-size: 0.8rem;
+  }
+}
