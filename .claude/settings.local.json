@@ -6,7 +6,8 @@
       "Bash(npx tsx:*)",
       "Bash(curl:*)",
       "Bash(d:/WebProjects/ArcRaidersLootList/temp_subcategories.json)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(gh api:*)"
     ],
     "deny": [],
     "ask": []
