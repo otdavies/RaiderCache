@@ -50,8 +50,10 @@ interface MetaForgeQuest {
   objectives?: string[];
   required_items?: any[];
   rewards?: any;
-  trader?: string;
+  trader_name?: string;
   xp?: number;
+  sort_order?: number;
+  position?: { x: number; y: number };
   [key: string]: any;
 }
 
@@ -305,7 +307,7 @@ async function fetchAllItems(): Promise<MetaForgeItem[]> {
 
       // Rate limiting: wait 500ms between requests to be respectful
       if (hasNextPage) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
       console.error(`  ❌ Failed to fetch page ${currentPage}:`, error);
@@ -337,7 +339,7 @@ async function fetchAllQuests(): Promise<MetaForgeQuest[]> {
       console.log(`  ✅ Page ${currentPage - 1}: ${response.data.length} quests (Total so far: ${allQuests.length})`);
 
       if (hasNextPage) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
       console.error(`  ❌ Failed to fetch quests page ${currentPage}:`, error);
@@ -400,11 +402,43 @@ async function fetchAllRecycleComponents(): Promise<Map<string, Record<string, n
 async function fetchAllMapData(): Promise<MapData[]> {
   console.log('📥 Fetching map marker data from MetaForge Supabase...');
 
-  // Discover available maps from the database
-  console.log('  🔍 Auto-discovering available maps...');
-  const allMarkers = await fetchSupabase<MapMarker[]>('arc_map_data', 'select=map');
-  const uniqueMaps = [...new Set(allMarkers.map(m => m.map))].sort();
-  console.log(`  ✅ Found ${uniqueMaps.length} maps: ${uniqueMaps.join(', ')}`);
+  // Discover available maps from the database with pagination
+  // Supabase has a max limit per request, so we need to paginate
+  console.log('  🔍 Auto-discovering available maps (with pagination)...');
+
+  const allMapNames = new Set<string>();
+  let offset = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const markers = await fetchSupabase<MapMarker[]>(
+      'arc_map_data',
+      `select=map&limit=${pageSize}&offset=${offset}`
+    );
+
+    console.log(`  📊 Retrieved ${markers.length} records (offset ${offset})...`);
+
+    for (const marker of markers) {
+      if (marker.map) {
+        allMapNames.add(marker.map);
+      }
+    }
+
+    if (markers.length < pageSize) {
+      hasMore = false;
+    } else {
+      offset += pageSize;
+    }
+
+    // Rate limiting between pages
+    if (hasMore) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  const uniqueMaps = [...allMapNames].sort();
+  console.log(`  ✅ Found ${uniqueMaps.length} unique maps: ${uniqueMaps.join(', ')}`);
 
   const mapDataArray: MapData[] = [];
 
@@ -412,35 +446,51 @@ async function fetchAllMapData(): Promise<MapData[]> {
     try {
       console.log(`  Fetching markers for ${mapName}...`);
 
-      const markers = await fetchSupabase<MapMarker[]>(
-        'arc_map_data',
-        `map=eq.${mapName}&select=*`
-      );
+      // Paginate to get all markers for this map
+      const allMarkers: MapMarker[] = [];
+      let mapOffset = 0;
+      let mapHasMore = true;
+
+      while (mapHasMore) {
+        const markers = await fetchSupabase<MapMarker[]>(
+          'arc_map_data',
+          `map=eq.${mapName}&select=*&limit=${pageSize}&offset=${mapOffset}`
+        );
+
+        allMarkers.push(...markers);
+
+        if (markers.length < pageSize) {
+          mapHasMore = false;
+        } else {
+          mapOffset += pageSize;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
 
       // Calculate stats
       const byCategory: Record<string, number> = {};
       const bySubcategory: Record<string, number> = {};
 
-      for (const marker of markers) {
+      for (const marker of allMarkers) {
         byCategory[marker.category] = (byCategory[marker.category] || 0) + 1;
         bySubcategory[marker.subcategory] = (bySubcategory[marker.subcategory] || 0) + 1;
       }
 
       const mapData: MapData = {
         map: mapName,
-        markers,
+        markers: allMarkers,
         stats: {
-          totalMarkers: markers.length,
+          totalMarkers: allMarkers.length,
           byCategory,
           bySubcategory
         }
       };
 
       mapDataArray.push(mapData);
-      console.log(`  ✅ ${mapName}: ${markers.length} markers`);
+      console.log(`  ✅ ${mapName}: ${allMarkers.length} markers`);
 
       // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 100));
     } catch (error) {
       console.error(`  ❌ Failed to fetch map data for ${mapName}:`, error);
     }
@@ -473,7 +523,7 @@ async function fetchMapImages(mapNames: string[]): Promise<number> {
       downloadedCount++;
 
       // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 100));
     } catch (error) {
       console.error(`  ❌ Failed to download ${mapName}.webp:`, error);
     }
@@ -483,7 +533,7 @@ async function fetchMapImages(mapNames: string[]): Promise<number> {
   return downloadedCount;
 }
 
-async function testTileUrl(url: string): Promise<boolean> {
+async function testUrl(url: string): Promise<boolean> {
   return new Promise((resolve) => {
     https.request(url, { method: 'HEAD' }, (res) => {
       resolve(res.statusCode === 200);
@@ -491,33 +541,240 @@ async function testTileUrl(url: string): Promise<boolean> {
   });
 }
 
+/**
+ * Generate all reasonable name variations for a map name
+ * e.g., "buried-city" -> ["buried-city", "buried_city", "buriedcity", "Buried-City", etc.]
+ */
+function generateNameVariations(name: string): string[] {
+  const variations = new Set<string>();
+  const normalized = name.toLowerCase().trim();
+
+  // Original and lowercase
+  variations.add(name);
+  variations.add(normalized);
+
+  // Hyphen/underscore/space variations
+  const withHyphens = normalized.replace(/[_\s]/g, '-');
+  const withUnderscores = normalized.replace(/[-\s]/g, '_');
+  const withoutSeparators = normalized.replace(/[-_\s]/g, '');
+
+  variations.add(withHyphens);
+  variations.add(withUnderscores);
+  variations.add(withoutSeparators);
+
+  // Also try kebab-case from underscore (stella_montis -> stella-montis)
+  if (normalized.includes('_')) {
+    variations.add(normalized.replace(/_/g, '-'));
+  }
+  if (normalized.includes('-')) {
+    variations.add(normalized.replace(/-/g, '_'));
+  }
+
+  return [...variations];
+}
+
+/**
+ * Load previously discovered maps from cache file
+ * This provides continuity across runs - once a map is found, we remember it
+ */
+function loadDiscoveredMapsCache(): string[] {
+  const cachePath = path.join(DATA_DIR, '.map-discovery-cache.json');
+  try {
+    if (fs.existsSync(cachePath)) {
+      const data = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
+      console.log(`  📦 Loaded ${data.maps?.length || 0} maps from discovery cache`);
+      return data.maps || [];
+    }
+  } catch (error) {
+    console.warn('  ⚠️  Could not load map discovery cache:', error);
+  }
+  return [];
+}
+
+/**
+ * Save discovered maps to cache file for future runs
+ */
+function saveDiscoveredMapsCache(maps: string[]): void {
+  const cachePath = path.join(DATA_DIR, '.map-discovery-cache.json');
+  try {
+    fs.writeFileSync(cachePath, JSON.stringify({
+      maps,
+      lastUpdated: new Date().toISOString()
+    }, null, 2));
+    console.log(`  💾 Saved ${maps.length} maps to discovery cache`);
+  } catch (error) {
+    console.warn('  ⚠️  Could not save map discovery cache:', error);
+  }
+}
+
+/**
+ * Discover available maps by probing the CDN for map images
+ * Uses multiple strategies:
+ * 1. Variations of Supabase map names
+ * 2. Previously discovered maps (from cache)
+ * 3. Common word patterns found in existing names
+ */
+async function discoverMapsFromCDN(supabaseMaps: string[]): Promise<string[]> {
+  console.log('  🔍 Probing CDN to discover available maps...');
+
+  const discoveredMaps = new Set<string>();
+  const cdnBaseUrl = 'https://cdn.metaforge.app/arc-raiders/ui';
+
+  // Load previously discovered maps from cache
+  const cachedMaps = loadDiscoveredMapsCache();
+
+  // Generate candidate map names from multiple sources
+  const candidates = new Set<string>();
+
+  // 1. Add variations of all Supabase maps
+  for (const mapName of supabaseMaps) {
+    for (const variation of generateNameVariations(mapName)) {
+      candidates.add(variation);
+    }
+  }
+
+  // 2. Add variations of all cached maps (in case Supabase lost some)
+  for (const mapName of cachedMaps) {
+    for (const variation of generateNameVariations(mapName)) {
+      candidates.add(variation);
+    }
+  }
+
+  // 3. Extract word components from known names and try new combinations
+  const wordComponents = new Set<string>();
+  for (const mapName of [...supabaseMaps, ...cachedMaps]) {
+    const words = mapName.toLowerCase().split(/[-_\s]/);
+    words.forEach(w => {
+      if (w.length > 2) wordComponents.add(w);
+    });
+  }
+
+  // 4. Add common location/map vocabulary words for bootstrapping discovery
+  // This isn't hardcoding map names - it's providing common words that MIGHT appear in map names
+  // If these don't exist on CDN, they simply won't be found
+  const locationVocabulary = [
+    // Common terrain/structure words
+    'dam', 'port', 'station', 'base', 'camp', 'outpost', 'facility', 'bunker',
+    'tower', 'bridge', 'tunnel', 'mine', 'factory', 'warehouse', 'depot',
+    // Common location descriptors
+    'north', 'south', 'east', 'west', 'central', 'old', 'new', 'upper', 'lower',
+    // Space/sci-fi themed
+    'space', 'stellar', 'stella', 'luna', 'solar', 'orbital', 'launch', 'landing',
+    // Nature/geography
+    'mountain', 'montis', 'valley', 'canyon', 'desert', 'forest', 'lake', 'river',
+    'coast', 'beach', 'cliff', 'hill', 'ridge', 'peak', 'crater',
+    // Urban
+    'city', 'town', 'village', 'district', 'zone', 'sector', 'hub', 'plaza',
+    // Condition descriptors
+    'buried', 'hidden', 'lost', 'ancient', 'ruined', 'abandoned', 'crashed',
+    // Colors (common in game map names)
+    'red', 'blue', 'green', 'black', 'white', 'grey', 'gray', 'golden', 'silver',
+    // Arc Raiders specific terms that might appear
+    'raider', 'arc', 'gate', 'haven', 'refuge', 'frontier'
+  ];
+
+  // Add vocabulary words to word components
+  locationVocabulary.forEach(w => wordComponents.add(w));
+
+  // Try single words as map names (e.g., "dam", "spaceport")
+  for (const word of wordComponents) {
+    candidates.add(word);
+    // Also try with common suffixes/prefixes
+    candidates.add(`${word}-new`);
+    candidates.add(`new-${word}`);
+    candidates.add(`the-${word}`);
+  }
+
+  // Try compound words (no separator)
+  for (const w1 of ['space', 'star', 'moon', 'sun', 'sky', 'air', 'sea']) {
+    for (const w2 of ['port', 'base', 'station', 'dock', 'hub']) {
+      candidates.add(`${w1}${w2}`);
+    }
+  }
+
+  // Try two-word combinations with common separators (limit to avoid explosion)
+  const priorityWords = ['buried', 'blue', 'stella', 'dam', 'space', 'port', 'city', 'gate', 'montis', 'old', 'new'];
+  for (const w1 of priorityWords) {
+    for (const w2 of priorityWords) {
+      if (w1 !== w2) {
+        candidates.add(`${w1}-${w2}`);
+        candidates.add(`${w1}_${w2}`);
+      }
+    }
+  }
+
+  console.log(`  Testing ${candidates.size} map name candidates on CDN...`);
+
+  // Test each candidate against the CDN (in parallel batches for speed)
+  const candidatesArray = [...candidates];
+  const batchSize = 5;
+
+  for (let i = 0; i < candidatesArray.length; i += batchSize) {
+    const batch = candidatesArray.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async candidate => {
+        const imageUrl = `${cdnBaseUrl}/${candidate}.webp`;
+        const exists = await testUrl(imageUrl);
+        return { candidate, exists };
+      })
+    );
+
+    for (const { candidate, exists } of results) {
+      if (exists) {
+        discoveredMaps.add(candidate);
+        console.log(`  ✅ Found map on CDN: ${candidate}`);
+      }
+    }
+
+    // Show progress
+    if ((i + batchSize) % 25 === 0 || i + batchSize >= candidatesArray.length) {
+      console.log(`  Tested ${Math.min(i + batchSize, candidatesArray.length)}/${candidatesArray.length} candidates...`);
+    }
+
+    // Rate limiting between batches
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  // Save discovered maps to cache for next run
+  const allDiscovered = [...discoveredMaps];
+  saveDiscoveredMapsCache(allDiscovered);
+
+  console.log(`  📍 CDN probe complete: found ${discoveredMaps.size} maps`);
+  return allDiscovered;
+}
+
 async function discoverMapTilePattern(mapName: string): Promise<{ baseUrl: string; separator: string } | null> {
   console.log(`  🔍 Discovering tile pattern for ${mapName}...`);
 
-  // Generate name variations
-  const nameWithUnderscore = mapName.replace(/-/g, '_');
-  const nameVariations = [mapName];
-  if (nameWithUnderscore !== mapName) {
-    nameVariations.push(nameWithUnderscore);
-  }
+  // Generate all name variations (hyphen, underscore, no separator, etc.)
+  const nameVariations = generateNameVariations(mapName);
 
-  // Generate historical dates (last 6 months of possible dates)
-  const historicalDates: string[] = [];
-  for (let monthsAgo = 0; monthsAgo < 6; monthsAgo++) {
+  // Generate dates for the last 30 days (daily, not monthly)
+  const recentDates: string[] = [];
+  for (let daysAgo = 0; daysAgo < 30; daysAgo++) {
     const date = new Date();
-    date.setMonth(date.getMonth() - monthsAgo);
-    historicalDates.push(date.toISOString().slice(0, 10).replace(/-/g, ''));
+    date.setDate(date.getDate() - daysAgo);
+    recentDates.push(date.toISOString().slice(0, 10).replace(/-/g, ''));
   }
 
-  const patterns = [];
+  const patterns: Array<{ url: string; baseUrl: string; separator: string; label: string }> = [];
 
   // For each name variation, try all patterns
   for (const name of nameVariations) {
+    // Try recent daily dates first (most likely to work)
     patterns.push(
-      // Current known patterns
+      ...recentDates.map(date => ({
+        url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/${date}/0/0/0.webp`,
+        baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/${date}`,
+        separator: '/',
+        label: `${name}/${date}`
+      }))
+    );
+
+    // Then try other known patterns
+    patterns.push(
       { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}-new/0/0_0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}-new`, separator: '_', label: `${name}-new` },
       { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/v2/0/0/0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/v2`, separator: '/', label: `${name}/v2` },
-      { url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/20251030/0/0/0.webp`, baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/20251030`, separator: '/', label: `${name}/20251030` },
 
       // Try version numbers 1-10
       ...Array.from({ length: 10 }, (_, i) => ({
@@ -525,14 +782,6 @@ async function discoverMapTilePattern(mapName: string): Promise<{ baseUrl: strin
         baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/v${i + 1}`,
         separator: '/',
         label: `${name}/v${i + 1}`
-      })),
-
-      // Try historical dates
-      ...historicalDates.map(date => ({
-        url: `https://cdn.metaforge.app/arc-raiders/maps/${name}/${date}/0/0/0.webp`,
-        baseUrl: `https://cdn.metaforge.app/arc-raiders/maps/${name}/${date}`,
-        separator: '/',
-        label: `${name}/${date}`
       })),
 
       // Base patterns without version/date
@@ -546,16 +795,16 @@ async function discoverMapTilePattern(mapName: string): Promise<{ baseUrl: strin
 
   for (const pattern of patterns) {
     testedCount++;
-    const exists = await testTileUrl(pattern.url);
+    const exists = await testUrl(pattern.url);
     if (exists) {
       console.log(`  ✅ Found pattern: ${pattern.baseUrl} (separator: '${pattern.separator}') after testing ${testedCount}/${patterns.length} patterns`);
       return { baseUrl: pattern.baseUrl, separator: pattern.separator };
     }
-    // Show progress every 5 patterns
-    if (testedCount % 5 === 0) {
+    // Show progress every 20 patterns
+    if (testedCount % 20 === 0) {
       console.log(`  Tested ${testedCount}/${patterns.length} patterns...`);
     }
-    await new Promise(resolve => setTimeout(resolve, 50)); // Rate limiting
+    await new Promise(resolve => setTimeout(resolve, 30)); // Rate limiting
   }
 
   console.warn(`  ⚠️  Tiles not available for ${mapName} (tested ${patterns.length} URL patterns)`);
@@ -776,14 +1025,18 @@ function mapMetaForgeItemToOurFormat(
 }
 
 function mapMetaForgeQuestToOurFormat(metaforgeQuest: MetaForgeQuest): any {
+  // Use position.y for sort order (lower y = earlier in quest progression)
+  const sortOrder = metaforgeQuest.position?.y ?? metaforgeQuest.sort_order ?? 0;
+
   return {
     id: metaforgeQuest.id,
     name: metaforgeQuest.name,
     objectives: metaforgeQuest.objectives || [],
     requirements: metaforgeQuest.required_items || [],
-    rewards: metaforgeQuest.rewards || {},
-    trader: metaforgeQuest.trader,
+    rewards: metaforgeQuest.rewards || [],
+    trader: metaforgeQuest.trader_name || 'Unknown',
     xp: metaforgeQuest.xp || 0,
+    sortOrder: sortOrder,
   };
 }
 
@@ -795,7 +1048,7 @@ async function main() {
 
   // Fetch crafting and recycling data from Supabase (with rate limiting)
   console.log('\n📥 Fetching crafting and recycling data from Supabase...');
-  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+  await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
   const [craftingMap, recycleMap] = await Promise.all([
     fetchAllCraftingComponents(),
     fetchAllRecycleComponents()
@@ -828,7 +1081,7 @@ async function main() {
 
   // Fetch map data from Supabase
   console.log('\n📥 Fetching map data from Supabase...');
-  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+  await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
   const mapData = await fetchAllMapData();
 
   // Save map data
@@ -840,18 +1093,29 @@ async function main() {
   const totalMapMarkers = mapData.reduce((sum, m) => sum + m.stats.totalMarkers, 0);
   console.log(`✅ Saved map data with ${totalMapMarkers} markers across ${mapData.length} maps`);
 
-  // Extract discovered map names
-  const discoveredMaps = mapData.map(m => m.map);
+  // Get map names from Supabase markers
+  const supabaseMaps = mapData.map(m => m.map);
+  console.log(`📍 Maps from Supabase markers: ${supabaseMaps.join(', ') || '(none)'}`);
+
+  // Discover actual available maps by probing the CDN
+  // This is resilient to name changes - we check what actually exists
+  const cdnMaps = await discoverMapsFromCDN(supabaseMaps);
+  console.log(`📍 Maps found on CDN: ${cdnMaps.join(', ') || '(none)'}`);
+
+  // Use CDN-discovered maps as the source of truth (they're what we can actually download)
+  // Fall back to Supabase names if CDN discovery fails completely
+  const allMaps = cdnMaps.length > 0 ? cdnMaps : supabaseMaps;
+  console.log(`📍 Maps to process: ${allMaps.join(', ')}`);
 
   // Download map images
   console.log('\n📥 Downloading map images...');
-  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
-  await fetchMapImages(discoveredMaps);
+  await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
+  await fetchMapImages(allMaps);
 
-  // Download map tiles
+  // Download map tiles for ALL maps (not just discovered ones)
   console.log('\n📥 Downloading map tiles...');
-  await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
-  await downloadMapTiles(discoveredMaps);
+  await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
+  await downloadMapTiles(allMaps);
 
   // Calculate map extents from downloaded tiles
   await calculateMapExtents();
@@ -944,6 +1208,12 @@ async function main() {
   console.log(`🗺️  Total maps: ${metadata.mapCount}`);
   console.log(`📍 Total map markers: ${metadata.mapMarkerCount}`);
   console.log(`\n⚠️  Note: Hideout modules and projects are stored in public/data/static/ and are not updated by this script.`);
+
+  // Force exit - Sharp's thread pool can keep Node alive
+  process.exit(0);
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
