@@ -609,7 +609,7 @@ body {
 .sidebar {
   position: sticky;
   top: 80px;
-  width: 220px;
+  width: 265px;
   flex-shrink: 0;
   background: var(--color-bg-card);
   border-radius: var(--radius-md);
@@ -802,10 +802,220 @@ body {
   transition: all var(--transition-fast);
 }
 
-.workshop-card__slider::-moz-range-thumb:hover {
-  width: 14px;
+/* Workshop card ticks (matching quest tracker style) */
+.workshop-card__ticks {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  margin-top: var(--spacing-sm);
+}
+
+.workshop-card__tick {
+  flex: 1;
   height: 14px;
-  box-shadow: 0 0 12px rgba(0, 188, 212, 0.8);
+  min-width: 0;
+  border-radius: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+/* Rounded left end on first tick */
+.workshop-card__tick:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+/* Rounded right end on last tick */
+.workshop-card__tick:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+/* Single tick gets both rounded ends */
+.workshop-card__tick:only-child {
+  border-radius: 6px;
+}
+
+.workshop-card__tick:hover {
+  transform: scaleY(1.15);
+  border-color: var(--color-accent-cyan);
+  background: rgba(0, 188, 212, 0.2);
+}
+
+.workshop-card__tick.completed {
+  background: var(--color-accent-cyan);
+  border-color: var(--color-accent-cyan);
+}
+
+/* ========================================
+   Quest Tracker
+   ======================================== */
+
+.quest-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.quest-tracker__empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--color-text-muted);
+}
+
+.quest-tracker__empty-hint {
+  font-size: 0.7rem;
+  margin-top: var(--spacing-sm);
+  opacity: 0.7;
+}
+
+.quest-card {
+  background: rgba(10, 14, 26, 0.6);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-bg-elevated);
+  transition: all var(--transition-base);
+}
+
+.quest-card:hover {
+  border-color: var(--color-accent-cyan);
+  background: rgba(10, 14, 26, 0.8);
+  transform: translateX(2px);
+}
+
+.quest-card h3 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quest-card__level {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.quest-card__level-text {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.quest-card__ticks {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  margin-top: var(--spacing-sm);
+}
+
+.quest-card__tick {
+  flex: 1;
+  height: 14px;
+  min-width: 0;
+  border-radius: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+/* Rounded left end on first tick */
+.quest-card__tick:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+/* Rounded right end on last tick */
+.quest-card__tick:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+/* Single tick gets both rounded ends */
+.quest-card__tick:only-child {
+  border-radius: 6px;
+}
+
+.quest-card__tick:hover {
+  transform: scaleY(1.15);
+  border-color: var(--color-accent-cyan);
+  background: rgba(0, 188, 212, 0.2);
+}
+
+.quest-card__tick.completed {
+  background: var(--color-accent-cyan);
+  border-color: var(--color-accent-cyan);
+}
+
+/* Quest Popover */
+.quest-popover {
+  position: fixed;
+  z-index: 1000;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-accent-cyan);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  max-width: 280px;
+  min-width: 200px;
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(0, 188, 212, 0.2);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.quest-popover__title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--color-bg-elevated);
+  padding-bottom: var(--spacing-xs);
+}
+
+.quest-popover__desc {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.4;
+}
+
+.quest-popover__section {
+  margin-top: var(--spacing-sm);
+}
+
+.quest-popover__section-title {
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--spacing-xs);
+}
+
+.quest-popover__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.quest-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--color-text-primary);
+}
+
+.quest-popover__item-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  border-radius: 2px;
+  background: var(--color-bg-dark);
+}
+
+.quest-popover__none {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 /* ========================================

@@ -125,6 +125,9 @@ class App {
     // Initialize zone filter
     this.initializeZoneFilter();
 
+    // Initialize quest tracker
+    this.initializeQuestTracker();
+
     // Initialize mobile menu
     this.initializeMobileMenu();
   }
@@ -479,7 +482,9 @@ class App {
       const moduleName = module.name;
 
       const getLevelText = (level: number) => {
-        return level === 0 ? 'Not Unlocked' : `Level ${level} / ${module.maxLevel}`;
+        if (level === 0) return 'Not Unlocked';
+        if (level === module.maxLevel) return `Level ${level} (Max)`;
+        return `Level ${level} / ${module.maxLevel}`;
       };
 
       const card = document.createElement('div');
@@ -488,32 +493,134 @@ class App {
         <h3>${moduleName}</h3>
         <div class="workshop-card__level">
           <span class="workshop-card__level-text">${getLevelText(currentLevel)}</span>
-          <input
-            type="range"
-            min="0"
-            max="${module.maxLevel}"
-            value="${currentLevel}"
-            data-module-id="${module.id}"
-            class="workshop-card__slider"
-          />
+          <div class="workshop-card__ticks"></div>
         </div>
       `;
 
-      const slider = card.querySelector('.workshop-card__slider') as HTMLInputElement;
       const levelText = card.querySelector('.workshop-card__level-text') as HTMLSpanElement;
+      const ticksContainer = card.querySelector('.workshop-card__ticks') as HTMLDivElement;
 
-      slider.addEventListener('input', (e) => {
-        const newLevel = parseInt((e.target as HTMLInputElement).value);
+      // Helper to update UI and save progress
+      const updateProgress = (newLevel: number) => {
         levelText.textContent = getLevelText(newLevel);
-      });
 
-      slider.addEventListener('change', (e) => {
-        const newLevel = parseInt((e.target as HTMLInputElement).value);
+        // Update tick visual states
+        ticksContainer.querySelectorAll('.workshop-card__tick').forEach((tick, idx) => {
+          tick.classList.toggle('completed', idx < newLevel);
+        });
+
+        // Save progress
         this.updateWorkshopLevel(module.id, newLevel);
-      });
+      };
+
+      // Create tick marks for each level (1 to maxLevel)
+      for (let level = 1; level <= module.maxLevel; level++) {
+        const tick = document.createElement('div');
+        tick.className = 'workshop-card__tick';
+        if (level <= currentLevel) {
+          tick.classList.add('completed');
+        }
+        tick.dataset.moduleId = module.id;
+        tick.dataset.level = String(level);
+
+        // Find level data for requirements
+        const levelData = module.levels.find(l => l.level === level);
+
+        // Add hover for popover
+        tick.addEventListener('mouseenter', (e) => this.showHideoutPopover(module, level, levelData, e));
+        tick.addEventListener('mouseleave', () => this.hideHideoutPopover());
+
+        // Click to set progress
+        tick.addEventListener('click', () => {
+          const currentlyCompleted = tick.classList.contains('completed');
+          // If clicking on a completed level, set to previous level
+          // If clicking on incomplete level, complete up to and including this one
+          const newLevel = currentlyCompleted ? level - 1 : level;
+          updateProgress(newLevel);
+        });
+
+        ticksContainer.appendChild(tick);
+      }
 
       workshopGrid.appendChild(card);
     });
+  }
+
+  private showHideoutPopover(module: any, level: number, levelData: any, event: MouseEvent) {
+    // Remove existing popover if any
+    this.hideHideoutPopover();
+
+    const popover = document.createElement('div');
+    popover.className = 'quest-popover'; // Reuse quest popover styling
+    popover.id = 'hideout-popover';
+
+    // Build requirements HTML
+    let requirementsHtml = '<span class="quest-popover__none">None</span>';
+    if (levelData?.requirementItemIds && levelData.requirementItemIds.length > 0) {
+      requirementsHtml = levelData.requirementItemIds.map((req: any) => {
+        const itemId = req.item_id || req.itemId;
+        const quantity = req.quantity || '?';
+        const item = this.gameData.items.find(i => i.id === itemId);
+        const itemName = item?.name || itemId || 'Unknown';
+        const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+
+        return `
+          <div class="quest-popover__item">
+            ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+            <span>${quantity}x ${itemName}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Check for other requirements (like coins for stash)
+    let otherReqsHtml = '';
+    if (levelData?.otherRequirements && levelData.otherRequirements.length > 0) {
+      otherReqsHtml = levelData.otherRequirements.map((req: string) => `
+        <div class="quest-popover__item">
+          <span>${req}</span>
+        </div>
+      `).join('');
+    }
+
+    const allRequirementsHtml = requirementsHtml + otherReqsHtml || '<span class="quest-popover__none">None</span>';
+
+    popover.innerHTML = `
+      <div class="quest-popover__title">${module.name} - Level ${level}</div>
+      ${levelData?.description ? `<div class="quest-popover__desc">${levelData.description}</div>` : ''}
+      <div class="quest-popover__section">
+        <div class="quest-popover__section-title">Requirements</div>
+        <div class="quest-popover__items">${allRequirementsHtml}</div>
+      </div>
+    `;
+
+    document.body.appendChild(popover);
+
+    // Position the popover near the tick (above it)
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+
+    let left = rect.left + rect.width / 2 - popoverRect.width / 2;
+    let top = rect.top - popoverRect.height - 8;
+
+    // Keep popover within viewport
+    if (left < 8) left = 8;
+    if (left + popoverRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - popoverRect.width - 8;
+    }
+    if (top < 8) {
+      top = rect.bottom + 8;
+    }
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  private hideHideoutPopover() {
+    const existing = document.getElementById('hideout-popover');
+    if (existing) {
+      existing.remove();
+    }
   }
 
   private updateWorkshopLevel(moduleId: string, level: number) {
@@ -544,6 +651,258 @@ class App {
     if (zoneFilterContainer) {
       this.zoneFilter.mount(zoneFilterContainer);
     }
+  }
+
+  private initializeQuestTracker() {
+    const questTracker = document.getElementById('quest-tracker');
+    if (!questTracker) return;
+
+    // Group quests by trader (quest giver)
+    const questsByTrader = new Map<string, typeof this.gameData.quests>();
+    for (const quest of this.gameData.quests) {
+      const trader = quest.trader || 'Unknown';
+      if (!questsByTrader.has(trader)) {
+        questsByTrader.set(trader, []);
+      }
+      questsByTrader.get(trader)!.push(quest);
+    }
+
+    // Sort quests within each trader by sortOrder
+    for (const [, quests] of questsByTrader) {
+      quests.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    }
+
+    // Sort traders alphabetically, but put "Unknown" at the end
+    const sortedTraders = [...questsByTrader.keys()].sort((a, b) => {
+      if (a === 'Unknown') return 1;
+      if (b === 'Unknown') return -1;
+      return a.localeCompare(b);
+    });
+
+    // Create a card for each trader
+    for (const trader of sortedTraders) {
+      const quests = questsByTrader.get(trader)!;
+      if (quests.length === 0) continue;
+
+      // Count completed quests for this trader
+      const completedCount = quests.filter(q =>
+        this.userProgress.completedQuests.includes(q.id)
+      ).length;
+
+      const card = document.createElement('div');
+      card.className = 'quest-card';
+
+      const questCountText = completedCount === quests.length
+        ? `All ${quests.length} Complete`
+        : `${completedCount} / ${quests.length}`;
+
+      card.innerHTML = `
+        <h3>${trader}</h3>
+        <div class="quest-card__level">
+          <span class="quest-card__level-text">${questCountText}</span>
+          <div class="quest-card__ticks"></div>
+        </div>
+      `;
+
+      const levelText = card.querySelector('.quest-card__level-text') as HTMLSpanElement;
+      const ticksContainer = card.querySelector('.quest-card__ticks') as HTMLDivElement;
+
+      // Helper to update UI and save progress
+      const updateProgress = (newValue: number) => {
+        const countText = newValue === quests.length
+          ? `All ${quests.length} Complete`
+          : `${newValue} / ${quests.length}`;
+        levelText.textContent = countText;
+
+        // Update tick visual states
+        ticksContainer.querySelectorAll('.quest-card__tick').forEach((tick, idx) => {
+          tick.classList.toggle('completed', idx < newValue);
+        });
+
+        // Save progress
+        this.updateQuestProgress(trader, quests, newValue);
+      };
+
+      // Create tick marks for each quest
+      quests.forEach((quest, index) => {
+        const tick = document.createElement('div');
+        tick.className = 'quest-card__tick';
+        if (index < completedCount) {
+          tick.classList.add('completed');
+        }
+        tick.dataset.questId = quest.id;
+        tick.dataset.questIndex = String(index);
+
+        // Add hover for popover
+        tick.addEventListener('mouseenter', (e) => this.showQuestPopover(quest, e));
+        tick.addEventListener('mouseleave', () => this.hideQuestPopover());
+
+        // Click to set progress up to this quest
+        tick.addEventListener('click', () => {
+          const currentlyCompleted = tick.classList.contains('completed');
+          // If clicking on a completed quest, uncomplete from here onwards
+          // If clicking on incomplete quest, complete up to and including this one
+          const newValue = currentlyCompleted ? index : index + 1;
+          updateProgress(newValue);
+        });
+
+        ticksContainer.appendChild(tick);
+      });
+
+      questTracker.appendChild(card);
+    }
+
+    // Show empty state if no quests
+    if (sortedTraders.length === 0 || this.gameData.quests.length === 0) {
+      questTracker.innerHTML = `
+        <div class="quest-tracker__empty">
+          <p>No quest data available</p>
+          <p class="quest-tracker__empty-hint">Quest data will appear here once loaded</p>
+        </div>
+      `;
+    }
+  }
+
+  private showQuestPopover(quest: any, event: MouseEvent) {
+    // Remove existing popover if any
+    this.hideQuestPopover();
+
+    const popover = document.createElement('div');
+    popover.className = 'quest-popover';
+    popover.id = 'quest-popover';
+
+    // Build requirements HTML
+    let requirementsHtml = '<span class="quest-popover__none">None</span>';
+    if (quest.requirements && quest.requirements.length > 0) {
+      requirementsHtml = quest.requirements.map((req: any) => {
+        const itemId = req.item_id || req.itemId;
+        const quantity = req.quantity || '?';
+        const item = this.gameData.items.find(i => i.id === itemId);
+        const itemName = item?.name || itemId || 'Unknown';
+        const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+
+        return `
+          <div class="quest-popover__item">
+            ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+            <span>${quantity}x ${itemName}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Build rewards HTML
+    let rewardsHtml = '<span class="quest-popover__none">None</span>';
+    const rewards: string[] = [];
+
+    if (quest.xp) {
+      rewards.push(`<div class="quest-popover__item"><span>${quest.xp} XP</span></div>`);
+    }
+
+    if (quest.rewards) {
+      if (quest.rewards.item_id || quest.rewards.itemId) {
+        const itemId = quest.rewards.item_id || quest.rewards.itemId;
+        const quantity = quest.rewards.quantity || 1;
+        const item = this.gameData.items.find(i => i.id === itemId);
+        const itemName = item?.name || itemId || 'Unknown';
+        const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+
+        rewards.push(`
+          <div class="quest-popover__item">
+            ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+            <span>${quantity}x ${itemName}</span>
+          </div>
+        `);
+      }
+
+      // Handle array of rewards
+      if (Array.isArray(quest.rewards)) {
+        quest.rewards.forEach((reward: any) => {
+          const itemId = reward.item_id || reward.itemId;
+          const quantity = reward.quantity || 1;
+          const item = this.gameData.items.find(i => i.id === itemId);
+          const itemName = item?.name || itemId || 'Unknown';
+          const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+
+          rewards.push(`
+            <div class="quest-popover__item">
+              ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+              <span>${quantity}x ${itemName}</span>
+            </div>
+          `);
+        });
+      }
+    }
+
+    if (rewards.length > 0) {
+      rewardsHtml = rewards.join('');
+    }
+
+    popover.innerHTML = `
+      <div class="quest-popover__title">${quest.name}</div>
+      ${quest.description ? `<div class="quest-popover__desc">${quest.description}</div>` : ''}
+      <div class="quest-popover__section">
+        <div class="quest-popover__section-title">Requirements</div>
+        <div class="quest-popover__items">${requirementsHtml}</div>
+      </div>
+      <div class="quest-popover__section">
+        <div class="quest-popover__section-title">Rewards</div>
+        <div class="quest-popover__items">${rewardsHtml}</div>
+      </div>
+    `;
+
+    document.body.appendChild(popover);
+
+    // Position the popover near the mouse
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+
+    let left = rect.left + rect.width / 2 - popoverRect.width / 2;
+    let top = rect.top - popoverRect.height - 8;
+
+    // Keep popover within viewport
+    if (left < 8) left = 8;
+    if (left + popoverRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - popoverRect.width - 8;
+    }
+    if (top < 8) {
+      top = rect.bottom + 8;
+    }
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  private hideQuestPopover() {
+    const existing = document.getElementById('quest-popover');
+    if (existing) {
+      existing.remove();
+    }
+  }
+
+  private updateQuestProgress(_trader: string, quests: any[], completedCount: number) {
+    // Get quest IDs to mark as complete (first N quests)
+    const questsToComplete = quests.slice(0, completedCount).map(q => q.id);
+    const questsToUncomplete = quests.slice(completedCount).map(q => q.id);
+
+    // Update completed quests in user progress
+    const completedSet = new Set(this.userProgress.completedQuests);
+
+    // Add completed quests
+    questsToComplete.forEach(id => completedSet.add(id));
+
+    // Remove uncompleted quests
+    questsToUncomplete.forEach(id => completedSet.delete(id));
+
+    this.userProgress.completedQuests = [...completedSet];
+    StorageManager.saveUserProgress(this.userProgress);
+
+    // Recalculate item decisions
+    this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
+    this.searchEngine.updateIndex(this.allItems);
+
+    // Re-apply filters and render
+    this.applyFilters();
+    this.updateStats();
   }
 
   private applyFilters() {

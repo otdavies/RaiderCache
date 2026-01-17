@@ -14,14 +14,17 @@ export interface QuestReward {
 
 export interface Quest {
   id: string;
-  name: string; // English only (previously multilingual)
-  description?: string; // English only (previously multilingual)
+  name: string;
+  description?: string;
+  objectives?: string[];
   requirements?: QuestRequirement[];
   rewards?: QuestReward[];
   rewardItemIds?: Array<{item_id: string; quantity: number}>;
-  questGiver?: string;
+  trader?: string;
+  questGiver?: string; // deprecated, use trader
   unlocks?: string[];
   xp?: number;
+  sortOrder?: number;
   updatedAt?: string;
   previousQuestIds?: string[];
   nextQuestIds?: string[];
