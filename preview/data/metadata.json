@@ -1,0 +1,37 @@
+{
+  "lastUpdated": "2026-01-15T04:19:33.405Z",
+  "source": "https://metaforge.app/arc-raiders (items, quests, maps)",
+  "staticSource": "Local static files (hideout modules & projects)",
+  "version": "2.1.0",
+  "itemCount": 520,
+  "questCount": 72,
+  "mapCount": 5,
+  "mapMarkerCount": 4244,
+  "maps": [
+    {
+      "name": "blue-gate",
+      "markerCount": 820,
+      "categories": 6
+    },
+    {
+      "name": "buried-city",
+      "markerCount": 874,
+      "categories": 6
+    },
+    {
+      "name": "dam",
+      "markerCount": 1000,
+      "categories": 6
+    },
+    {
+      "name": "spaceport",
+      "markerCount": 1000,
+      "categories": 6
+    },
+    {
+      "name": "stella-montis",
+      "markerCount": 550,
+      "categories": 5
+    }
+  ]
+}

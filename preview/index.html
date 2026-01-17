@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Arc Raiders Loot Decision Tool - Quickly determine what to keep, recycle, or sell">
+  <title>Arc Raiders Loot List - Keep, Recycle, or Sell Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Barlow+Semi+Condensed:wght@700&display=swap"
+    rel="stylesheet">
+  <script type="module" crossorigin src="/RaiderCache/preview/assets/index-C7IiywY8.js"></script>
+  <link rel="modulepreload" crossorigin href="/RaiderCache/preview/assets/search-Ch1WBRTM.js">
+  <link rel="stylesheet" crossorigin href="/RaiderCache/preview/assets/index-C4lH2FKC.css">
+</head>
+
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="container">
+        <div class="header-layout">
+          <div class="header-left">
+            <h1 class="logo">
+              <span class="logo-text">ARC RAIDERS</span>
+              <span class="logo-subtitle">Loot Decision Tool</span>
+            </h1>
+          </div>
+          <div class="header-right">
+            <div class="header-search">
+              <input type="search" id="search" placeholder="Search items..." class="search-input-header"
+                autocomplete="off" />
+            </div>
+            <div class="header-sort">
+              <select id="sort-selector" class="sort-select">
+                <option value="name">Name</option>
+                <option value="value">Value</option>
+                <option value="rarity">Rarity</option>
+                <option value="weight">Weight</option>
+                <option value="decision">Decision</option>
+              </select>
+              <button id="sort-direction-btn" class="sort-direction-btn" title="Sort ascending">↑</button>
+            </div>
+            <div class="view-toggle">
+              <button class="toggle-btn active" data-view="grid">Grid</button>
+              <button class="toggle-btn" data-view="list">List</button>
+            </div>
+            <a href="https://github.com/otdavies/RaiderCache" target="_blank" rel="noopener" class="github-link" title="View on GitHub">
+              <img src="https://cdn.simpleicons.org/github/white" alt="GitHub" width="20" height="20">
+            </a>
+            <!-- Mobile menu -->
+            <div class="mobile-menu">
+              <button class="mobile-menu-btn" id="mobile-menu-btn" title="Menu">⋮</button>
+              <div class="mobile-menu-dropdown" id="mobile-menu-dropdown">
+                <button class="mobile-menu-item" id="mobile-filters-btn">Filters</button>
+                <div class="mobile-menu-divider"></div>
+                <div class="mobile-menu-item mobile-menu-sort">
+                  <label>Sort:</label>
+                  <select id="mobile-sort-selector" class="mobile-sort-select">
+                    <option value="name">Name</option>
+                    <option value="value">Value</option>
+                    <option value="rarity">Rarity</option>
+                    <option value="weight">Weight</option>
+                    <option value="decision">Decision</option>
+                  </select>
+                </div>
+                <div class="mobile-menu-item mobile-view-toggle">
+                  <button class="mobile-view-btn" data-view="grid" title="Grid view">▦</button>
+                  <button class="mobile-view-btn" data-view="list" title="List view">☰</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="container">
+        <div class="layout-wrapper">
+          <!-- Sidebar with Tabbed Interface -->
+          <aside class="sidebar">
+            <!-- Tab Navigation -->
+            <div class="sidebar-tabs">
+              <button class="sidebar-tab" data-tab="hideout">Hideout</button>
+              <button class="sidebar-tab" data-tab="filters">Filters</button>
+              <button class="sidebar-tab" data-tab="location">Location</button>
+              <button class="sidebar-tab" data-tab="quest">Quest</button>
+            </div>
+
+            <!-- Tab Panels -->
+            <div class="sidebar-panels">
+              <!-- Hideout Panel -->
+              <div class="sidebar-panel" id="panel-hideout">
+                <div class="workshop-grid" id="workshop-grid"></div>
+              </div>
+
+              <!-- Filters Panel -->
+              <div class="sidebar-panel" id="panel-filters">
+                <div class="filters" id="filters">
+                  <div class="filter-group">
+                    <label class="filter-label">Decision:</label>
+                    <div class="filter-buttons" id="decision-filter"></div>
+                  </div>
+
+                  <div class="filter-group">
+                    <label class="filter-label">Rarity:</label>
+                    <div class="filter-buttons" id="rarity-filter"></div>
+                  </div>
+
+                  <div class="filter-group filter-group--category">
+                    <div class="filter-label-row">
+                      <label class="filter-label">Category:</label>
+                      <button class="category-reset-btn" id="category-reset">Reset</button>
+                    </div>
+                    <div class="filter-buttons filter-buttons--category" id="category-filter"></div>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Location Panel -->
+              <div class="sidebar-panel" id="panel-location">
+                <div id="zone-filter-container"></div>
+              </div>
+
+              <!-- Quest Panel -->
+              <div class="sidebar-panel" id="panel-quest">
+                <div class="quest-tracker" id="quest-tracker"></div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Main Content Area -->
+          <div class="main-content">
+            <!-- Items Grid -->
+            <div class="items-section">
+              <div class="items-grid" id="items-grid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <p>Data auto-updates daily from community sources • Not affiliated with Embark Studios</p>
+        <p class="update-info">Last updated: <span id="last-update">Loading...</span></p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- PvP Gate Modal -->
+  <div class="modal" id="pvp-gate-modal"></div>
+
+  <!-- Item Detail Modal -->
+  <div class="modal" id="item-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content"></div>
+  </div>
+
+
+  <!-- Some basic page view tracking -->
+  <script defer src='https://static.cloudflareinsights.com/beacon.min.js'
+    data-cf-beacon='{"token": "b89a5157dd8849369d9efea9e5a3b210"}'></script>
+</body>
+
+</html>

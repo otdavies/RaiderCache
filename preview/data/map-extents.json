@@ -1,0 +1,62 @@
+{
+  "blue-gate": {
+    "worldExtent": [
+      0,
+      0,
+      10240,
+      8192
+    ],
+    "tileSize": 512,
+    "center": [
+      5120,
+      4096
+    ],
+    "tilesWide": 10,
+    "tilesHigh": 8
+  },
+  "buried-city": {
+    "worldExtent": [
+      0,
+      0,
+      15360,
+      10240
+    ],
+    "tileSize": 512,
+    "center": [
+      7680,
+      5120
+    ],
+    "tilesWide": 15,
+    "tilesHigh": 10
+  },
+  "dam": {
+    "worldExtent": [
+      0,
+      0,
+      8192,
+      8192
+    ],
+    "tileSize": 256,
+    "center": [
+      4096,
+      4096
+    ],
+    "tilesWide": 16,
+    "tilesHigh": 16
+  },
+  "spaceport": {
+    "worldExtent": [
+      0,
+      0,
+      9216,
+      6144
+    ],
+    "tileSize": 512,
+    "center": [
+      4608,
+      3072
+    ],
+    "tilesWide": 9,
+    "tilesHigh": 6
+  }
+}
