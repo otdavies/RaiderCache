@@ -21,10 +21,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           lfs: true
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,8 +39,39 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-      - name: Build
+      - name: Build main site
         run: npm run build
+
+      - name: Check for preview branch
+        id: preview
+        run: |
+          # Find the most recent claude/* branch
+          PREVIEW_BRANCH=$(git branch -r | grep 'origin/claude/' | head -1 | tr -d ' ')
+          if [ -n "$PREVIEW_BRANCH" ]; then
+            echo "branch=${PREVIEW_BRANCH#origin/}" >> $GITHUB_OUTPUT
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Found preview branch: $PREVIEW_BRANCH"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No preview branch found"
+          fi
+
+      - name: Build preview site
+        if: steps.preview.outputs.exists == 'true'
+        run: |
+          # Save main build
+          mv dist main-dist
+
+          # Checkout and build preview branch
+          git checkout ${{ steps.preview.outputs.branch }}
+          npm ci
+          npx vite build --base=/RaiderCache/preview/
+
+          # Combine builds
+          mv main-dist dist-combined
+          mkdir -p dist-combined/preview
+          cp -r dist/* dist-combined/preview/
+          mv dist-combined dist
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

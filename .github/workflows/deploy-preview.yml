@@ -1,0 +1,81 @@
+name: Deploy Preview
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}preview/
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          lfs: true
+          path: main
+
+      - name: Checkout preview branch
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          path: preview
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build main site
+        working-directory: main
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build preview site
+        working-directory: preview
+        run: |
+          npm ci
+          npm run type-check
+          npx vite build --base=/RaiderCache/preview/
+
+      - name: Combine builds
+        run: |
+          mkdir -p combined
+          cp -r main/dist/* combined/
+          mkdir -p combined/preview
+          cp -r preview/dist/* combined/preview/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./combined
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Summary
+        run: |
+          echo "### Deployed! :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Main site:** https://otdavies.github.io/RaiderCache/" >> $GITHUB_STEP_SUMMARY
+          echo "**Preview:** https://otdavies.github.io/RaiderCache/preview/" >> $GITHUB_STEP_SUMMARY
