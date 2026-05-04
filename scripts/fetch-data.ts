@@ -869,12 +869,52 @@ async function fetchRaidTheoryQuests(): Promise<any[]> {
         ))
       );
 
-      const questsWithRequiredItemIds = rawQuests.filter(
-        (quest) => Array.isArray(quest.requiredItemIds) && quest.requiredItemIds.length > 0
+      const validRawQuests = rawQuests.filter(
+        (quest): quest is RaidTheoryQuest => !!quest && typeof quest.id === 'string' && quest.id.length > 0
+      );
+      const questById = new Map(validRawQuests.map((quest) => [quest.id, quest]));
+
+      // Keep quests with required items, then expand to include all linked relation quests.
+      const includedQuestIds = new Set(
+        validRawQuests
+          .filter((quest) => Array.isArray(quest.requiredItemIds) && quest.requiredItemIds.length > 0)
+          .map((quest) => quest.id)
       );
 
-      const mappedQuests = questsWithRequiredItemIds
-        .map((quest, index) => mapRaidTheoryQuestToOurFormat(quest, index));
+      const stack = [...includedQuestIds];
+      while (stack.length > 0) {
+        const questId = stack.pop() as string;
+        const quest = questById.get(questId);
+        if (!quest) {
+          continue;
+        }
+
+        const relatedQuestIds = [
+          ...(Array.isArray(quest.previousQuestIds) ? quest.previousQuestIds : []),
+          ...(Array.isArray(quest.nextQuestIds) ? quest.nextQuestIds : [])
+        ];
+
+        for (const relatedQuestId of relatedQuestIds) {
+          if (!questById.has(relatedQuestId) || includedQuestIds.has(relatedQuestId)) {
+            continue;
+          }
+          includedQuestIds.add(relatedQuestId);
+          stack.push(relatedQuestId);
+        }
+      }
+
+      const selectedRawQuests = validRawQuests.filter((quest) => includedQuestIds.has(quest.id));
+      const selectedQuestIdSet = new Set(selectedRawQuests.map((quest) => quest.id));
+
+      const mappedQuests = selectedRawQuests
+        .map((quest, index) => {
+          const mappedQuest = mapRaidTheoryQuestToOurFormat(quest, index);
+          return {
+            ...mappedQuest,
+            previousQuestIds: mappedQuest.previousQuestIds.filter((id) => selectedQuestIdSet.has(id)),
+            nextQuestIds: mappedQuest.nextQuestIds.filter((id) => selectedQuestIdSet.has(id))
+          };
+        });
 
       console.log(`✅ Fetched ${mappedQuests.length} quests from RaidTheory`);
       return mappedQuests;

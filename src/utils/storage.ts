@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
   CATEGORY_FILTERS: 'arc_raiders_category_filters',
   PVP_GATE: 'arc_raiders_pvp_gate',
   VIEW_MODE: 'arc_raiders_view_mode',
-  SIDEBAR_HIDDEN: 'arc_raiders_sidebar_hidden'
+  SIDEBAR_HIDDEN: 'arc_raiders_sidebar_hidden',
+  QUEST_SHOW_NON_ITEM: 'arc_raiders_quest_show_non_item'
 } as const;
 
 export type CategoryFilterState = Record<string, 'include' | 'exclude'>;
@@ -256,6 +257,22 @@ export class StorageManager {
       localStorage.setItem(STORAGE_KEYS.SIDEBAR_HIDDEN, String(hidden));
     } catch (error) {
       console.error('Failed to save sidebar state:', error);
+    }
+  }
+
+  static loadQuestShowNonItem(): boolean {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.QUEST_SHOW_NON_ITEM) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  static saveQuestShowNonItem(show: boolean): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.QUEST_SHOW_NON_ITEM, String(show));
+    } catch (error) {
+      console.error('Failed to save quest toggle state:', error);
     }
   }
 }

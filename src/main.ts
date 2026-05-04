@@ -6,6 +6,7 @@ import { StorageManager } from './utils/storage';
 import type { UserProgress } from './types/UserProgress';
 import type { Item, RecycleDecision } from './types/Item';
 import type { Project } from './types/Project';
+import type { Quest } from './types/Quest';
 import { ItemCard } from './components/ItemCard';
 import { ItemModal } from './components/ItemModal';
 import { ZoneFilter } from './components/ZoneFilter';
@@ -19,6 +20,9 @@ class App {
   private allItems: SearchableItem[] = [];
   private filteredItems: SearchableItem[] = [];
   private zoneFilter!: ZoneFilter;
+  private questPreviousRelations = new Map<string, string[]>();
+  private showNonItemQuestNodes: boolean;
+  private questSearchQuery: string = '';
 
   private searchInput!: HTMLInputElement;
   private itemsGrid!: HTMLElement;
@@ -35,6 +39,7 @@ class App {
 
   constructor() {
     this.userProgress = StorageManager.loadUserProgress();
+    this.showNonItemQuestNodes = StorageManager.loadQuestShowNonItem();
   }
 
   async init() {
@@ -62,6 +67,11 @@ class App {
       // Filter out blacklisted garbage items
       const itemBlacklist = ['refinement-1'];
       this.allItems = this.allItems.filter(item => !itemBlacklist.includes(item.id));
+
+      // Hide items without images from the list UI.
+      this.allItems = this.allItems.filter(item =>
+        typeof item.imageFilename === 'string' && item.imageFilename.trim().length > 0
+      );
 
       // Initialize search engine
       this.searchEngine = new SearchEngine(this.allItems);
@@ -128,6 +138,9 @@ class App {
 
     // Initialize zone filter
     this.initializeZoneFilter();
+
+    // Initialize quest tracker controls
+    this.initializeQuestTrackerToggle();
 
     // Initialize quest tracker
     this.initializeQuestTracker();
@@ -577,7 +590,9 @@ class App {
         const quantity = req.quantity || '?';
         const item = this.gameData.items.find(i => i.id === itemId);
         const itemName = item?.name || itemId || 'Unknown';
-        const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+        const iconUrl = item && typeof item.imageFilename === 'string' && item.imageFilename.trim().length > 0
+          ? dataLoader.getIconUrl(item)
+          : '';
 
         return `
           <div class="quest-popover__item">
@@ -672,9 +687,30 @@ class App {
     const questTracker = document.getElementById('quest-tracker');
     if (!questTracker) return;
 
+    questTracker.innerHTML = '';
+    this.buildQuestRelations(this.gameData.quests);
+    const visibleQuests = this.gameData.quests.filter((quest) => {
+      const hasItemRequirements = this.hasQuestItemRequirements(quest);
+      if (!this.showNonItemQuestNodes && !hasItemRequirements) {
+        return false;
+      }
+
+      if (!hasItemRequirements) {
+        return true;
+      }
+
+      // Keep dependency-chain quests visible even when required item images are missing,
+      // but only when the non-item toggle is active.
+      const hasQuestRelations =
+        (Array.isArray(quest.previousQuestIds) && quest.previousQuestIds.length > 0) ||
+        (Array.isArray(quest.nextQuestIds) && quest.nextQuestIds.length > 0);
+
+      return this.hasQuestRequirementImage(quest) || (this.showNonItemQuestNodes && hasQuestRelations);
+    });
+
     // Group quests by trader (quest giver)
     const questsByTrader = new Map<string, typeof this.gameData.quests>();
-    for (const quest of this.gameData.quests) {
+    for (const quest of visibleQuests) {
       const trader = quest.trader || 'Unknown';
       if (!questsByTrader.has(trader)) {
         questsByTrader.set(trader, []);
@@ -682,9 +718,10 @@ class App {
       questsByTrader.get(trader)!.push(quest);
     }
 
-    // Sort quests within each trader by sortOrder
+    // Order quests within each trader by dependency relations, with sortOrder as fallback
     for (const [, quests] of questsByTrader) {
-      quests.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      const ordered = this.orderQuestsByRelations(quests);
+      quests.splice(0, quests.length, ...ordered);
     }
 
     // Sort traders alphabetically, but put "Unknown" at the end
@@ -719,14 +756,21 @@ class App {
         </div>
       `;
 
-      const levelText = card.querySelector('.quest-card__level-text') as HTMLSpanElement;
       const ticksContainer = card.querySelector('.quest-card__ticks') as HTMLDivElement;
 
       // Create tick marks for each quest
       quests.forEach((quest, index) => {
         const tick = document.createElement('div');
         tick.className = 'quest-card__tick';
-        if (index < completedCount) {
+        if (!this.hasQuestItemRequirements(quest)) {
+          tick.classList.add('quest-card__tick--non-item');
+        }
+        if (this.questMatchesSearch(quest)) {
+          tick.classList.add('quest-card__tick--search-match');
+        } else if (this.questHasMatchingRelation(quest)) {
+          tick.classList.add('quest-card__tick--search-related');
+        }
+        if (this.userProgress.completedQuests.includes(quest.id)) {
           tick.classList.add('completed');
         }
         tick.dataset.questId = quest.id;
@@ -742,19 +786,16 @@ class App {
           if (completedSet.has(quest.id)) {
             completedSet.delete(quest.id);
           } else {
+            // Completing a quest also completes every prerequisite in its relation chain.
+            const previousQuestIds = this.getAllPreviousQuestIds(quest.id);
+            previousQuestIds.forEach(id => completedSet.add(id));
             completedSet.add(quest.id);
           }
           this.userProgress.completedQuests = [...completedSet];
           StorageManager.saveUserProgress(this.userProgress);
 
-          // Update UI for this trader group
-          const newCount = quests.filter(q => completedSet.has(q.id)).length;
-          levelText.textContent = newCount === quests.length
-            ? `All ${quests.length} Complete`
-            : `${newCount} / ${quests.length}`;
-          ticksContainer.querySelectorAll('.quest-card__tick').forEach((t, idx) => {
-            t.classList.toggle('completed', completedSet.has(quests[idx].id));
-          });
+          // Re-render to ensure prerequisite completions are reflected across all trader groups.
+          this.initializeQuestTracker();
 
           this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
           this.searchEngine.updateIndex(this.allItems);
@@ -769,7 +810,7 @@ class App {
     }
 
     // Show empty state if no quests
-    if (sortedTraders.length === 0 || this.gameData.quests.length === 0) {
+    if (sortedTraders.length === 0 || visibleQuests.length === 0) {
       questTracker.innerHTML = `
         <div class="quest-tracker__empty">
           <p>No quest data available</p>
@@ -777,6 +818,141 @@ class App {
         </div>
       `;
     }
+
+    this.updateQuestSearchHighlights();
+  }
+
+  private buildQuestRelations(quests: Quest[]): void {
+    const validIds = new Set(quests.map(quest => quest.id));
+    const previousMap = new Map<string, Set<string>>();
+    const nextMap = new Map<string, Set<string>>();
+
+    for (const quest of quests) {
+      previousMap.set(quest.id, new Set<string>());
+      nextMap.set(quest.id, new Set<string>());
+    }
+
+    for (const quest of quests) {
+      const questId = quest.id;
+      const previousIds = Array.isArray(quest.previousQuestIds) ? quest.previousQuestIds : [];
+      const nextIds = Array.isArray(quest.nextQuestIds) ? quest.nextQuestIds : [];
+
+      for (const previousId of previousIds) {
+        if (!validIds.has(previousId)) continue;
+        previousMap.get(questId)?.add(previousId);
+        nextMap.get(previousId)?.add(questId);
+      }
+
+      for (const nextId of nextIds) {
+        if (!validIds.has(nextId)) continue;
+        nextMap.get(questId)?.add(nextId);
+        previousMap.get(nextId)?.add(questId);
+      }
+    }
+
+    const sortByQuestOrder = (a: string, b: string): number => {
+      const qa = quests.find(q => q.id === a);
+      const qb = quests.find(q => q.id === b);
+      if (!qa && !qb) return 0;
+      if (!qa) return 1;
+      if (!qb) return -1;
+      return this.compareQuests(qa, qb);
+    };
+
+    this.questPreviousRelations = new Map(
+      [...previousMap.entries()].map(([id, ids]) => [id, [...ids].sort(sortByQuestOrder)])
+    );
+  }
+
+  private orderQuestsByRelations(quests: Quest[]): Quest[] {
+    const questById = new Map(quests.map(quest => [quest.id, quest]));
+    const ids = new Set(quests.map(quest => quest.id));
+    const indegree = new Map<string, number>();
+    const outgoing = new Map<string, string[]>();
+
+    for (const quest of quests) {
+      indegree.set(quest.id, 0);
+      outgoing.set(quest.id, []);
+    }
+
+    for (const quest of quests) {
+      // Use transitive previous relations so visible quests are still ordered correctly
+      // when hidden/non-item quests exist between two visible nodes.
+      const previousIds = this.getAllPreviousQuestIds(quest.id);
+      for (const previousId of previousIds) {
+        if (!ids.has(previousId)) continue;
+        indegree.set(quest.id, (indegree.get(quest.id) || 0) + 1);
+        const list = outgoing.get(previousId);
+        if (list && !list.includes(quest.id)) {
+          list.push(quest.id);
+        }
+      }
+    }
+
+    const queue = quests
+      .filter(quest => (indegree.get(quest.id) || 0) === 0)
+      .sort((a, b) => this.compareQuests(a, b));
+
+    const ordered: Quest[] = [];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      ordered.push(current);
+
+      const dependents = outgoing.get(current.id) || [];
+      for (const dependentId of dependents) {
+        const nextValue = (indegree.get(dependentId) || 0) - 1;
+        indegree.set(dependentId, nextValue);
+        if (nextValue === 0) {
+          const dependentQuest = questById.get(dependentId);
+          if (dependentQuest) queue.push(dependentQuest);
+        }
+      }
+
+      queue.sort((a, b) => this.compareQuests(a, b));
+    }
+
+    // Guard against cycles or malformed relations by appending any remaining quests.
+    if (ordered.length < quests.length) {
+      const orderedIds = new Set(ordered.map(quest => quest.id));
+      const remaining = quests
+        .filter(quest => !orderedIds.has(quest.id))
+        .sort((a, b) => this.compareQuests(a, b));
+      ordered.push(...remaining);
+    }
+
+    return ordered;
+  }
+
+  private getAllPreviousQuestIds(questId: string): string[] {
+    const visited = new Set<string>();
+    const stack = [...(this.questPreviousRelations.get(questId) || [])];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+
+      const previousOfCurrent = this.questPreviousRelations.get(currentId) || [];
+      for (const previousId of previousOfCurrent) {
+        if (!visited.has(previousId)) {
+          stack.push(previousId);
+        }
+      }
+    }
+
+    return [...visited];
+  }
+
+  private compareQuests(a: Quest, b: Quest): number {
+    const aOrder = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+
+    return a.name.localeCompare(b.name);
   }
 
   private getProjectMaxPhase(project: Project): number {
@@ -1001,6 +1177,16 @@ class App {
     popover.className = 'quest-popover';
     popover.id = 'quest-popover';
 
+    const fallbackIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" rx="2" fill="#212a2e"/><text x="10" y="14" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" fill="#b0bec5">?</text></svg>';
+    const fallbackIconUrl = `data:image/svg+xml,${encodeURIComponent(fallbackIconSvg)}`;
+    const renderItemIcon = (iconUrl: string): string => {
+      if (!iconUrl) {
+        return `<img src="${fallbackIconUrl}" alt="" class="quest-popover__item-icon" />`;
+      }
+
+      return `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" onerror="this.onerror=null;this.src='${fallbackIconUrl}'" />`;
+    };
+
     // Build requirements HTML
     let requirementsHtml = '<span class="quest-popover__none">None</span>';
     if (quest.requirements && quest.requirements.length > 0) {
@@ -1013,7 +1199,7 @@ class App {
 
         return `
           <div class="quest-popover__item">
-            ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+            ${renderItemIcon(iconUrl)}
             <span>${quantity}x ${itemName}</span>
           </div>
         `;
@@ -1034,11 +1220,13 @@ class App {
         const quantity = quest.rewards.quantity || 1;
         const item = this.gameData.items.find(i => i.id === itemId);
         const itemName = item?.name || itemId || 'Unknown';
-        const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+        const iconUrl = item && typeof item.imageFilename === 'string' && item.imageFilename.trim().length > 0
+          ? dataLoader.getIconUrl(item)
+          : '';
 
         rewards.push(`
           <div class="quest-popover__item">
-            ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+            ${renderItemIcon(iconUrl)}
             <span>${quantity}x ${itemName}</span>
           </div>
         `);
@@ -1051,11 +1239,13 @@ class App {
           const quantity = reward.quantity || 1;
           const item = this.gameData.items.find(i => i.id === itemId);
           const itemName = item?.name || itemId || 'Unknown';
-          const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+          const iconUrl = item && typeof item.imageFilename === 'string' && item.imageFilename.trim().length > 0
+            ? dataLoader.getIconUrl(item)
+            : '';
 
           rewards.push(`
             <div class="quest-popover__item">
-              ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+              ${renderItemIcon(iconUrl)}
               <span>${quantity}x ${itemName}</span>
             </div>
           `);
@@ -1067,6 +1257,24 @@ class App {
       rewardsHtml = rewards.join('');
     }
 
+    const renderRelationHtml = (relationIds: unknown): string => {
+      if (!Array.isArray(relationIds) || relationIds.length === 0) {
+        return '<span class="quest-popover__none">None</span>';
+      }
+
+      return relationIds
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        .map((id) => {
+          const relatedQuest = this.gameData.quests.find((q) => q.id === id);
+          const label = relatedQuest?.name || id;
+          return `<div class="quest-popover__item"><span>${label}</span></div>`;
+        })
+        .join('');
+    };
+
+    const previousHtml = renderRelationHtml(quest.previousQuestIds);
+    const unlocksHtml = renderRelationHtml(quest.nextQuestIds);
+
     popover.innerHTML = `
       <div class="quest-popover__title">${quest.name}</div>
       ${quest.description ? `<div class="quest-popover__desc">${quest.description}</div>` : ''}
@@ -1077,6 +1285,14 @@ class App {
       <div class="quest-popover__section">
         <div class="quest-popover__section-title">Rewards</div>
         <div class="quest-popover__items">${rewardsHtml}</div>
+      </div>
+      <div class="quest-popover__section">
+        <div class="quest-popover__section-title">Previous</div>
+        <div class="quest-popover__items">${previousHtml}</div>
+      </div>
+      <div class="quest-popover__section">
+        <div class="quest-popover__section-title">Unlocks</div>
+        <div class="quest-popover__items">${unlocksHtml}</div>
       </div>
     `;
 
@@ -1107,6 +1323,123 @@ class App {
     if (existing) {
       existing.remove();
     }
+  }
+
+  private initializeQuestTrackerToggle() {
+    const button = document.getElementById('quest-non-item-toggle') as HTMLButtonElement | null;
+    const searchInput = document.getElementById('quest-search-input') as HTMLInputElement | null;
+    if (!button) {
+      return;
+    }
+
+    const updateButtonState = () => {
+      const isActive = this.showNonItemQuestNodes;
+      button.classList.toggle('inactive', !isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      button.textContent = 'Non-Item Quests';
+    };
+
+    updateButtonState();
+
+    if (searchInput) {
+      searchInput.value = this.questSearchQuery;
+      searchInput.addEventListener('input', (event) => {
+        this.questSearchQuery = (event.target as HTMLInputElement).value;
+        this.updateQuestSearchHighlights();
+      });
+    }
+
+    button.addEventListener('click', () => {
+      this.showNonItemQuestNodes = !this.showNonItemQuestNodes;
+      StorageManager.saveQuestShowNonItem(this.showNonItemQuestNodes);
+      updateButtonState();
+      this.initializeQuestTracker();
+    });
+  }
+
+  private questMatchesSearch(quest: Quest): boolean {
+    const query = this.questSearchQuery.trim().toLowerCase();
+    if (!query) {
+      return false;
+    }
+
+    return quest.name.toLowerCase().includes(query) || quest.id.toLowerCase().includes(query);
+  }
+
+  private questHasMatchingRelation(quest: Quest): boolean {
+    const query = this.questSearchQuery.trim().toLowerCase();
+    if (!query) {
+      return false;
+    }
+
+    const relatedIds = [
+      ...(Array.isArray(quest.previousQuestIds) ? quest.previousQuestIds : []),
+      ...(Array.isArray(quest.nextQuestIds) ? quest.nextQuestIds : [])
+    ];
+
+    return relatedIds.some((id) => {
+      if (typeof id !== 'string') {
+        return false;
+      }
+
+      if (id.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      const relatedQuest = this.gameData.quests.find((entry) => entry.id === id);
+      return relatedQuest ? relatedQuest.name.toLowerCase().includes(query) : false;
+    });
+  }
+
+  private updateQuestSearchHighlights() {
+    const ticks = document.querySelectorAll('.quest-card__tick');
+
+    ticks.forEach((tick) => {
+      const element = tick as HTMLElement;
+      const questId = element.dataset.questId;
+      if (!questId) {
+        element.classList.remove('quest-card__tick--search-match');
+        return;
+      }
+
+      const quest = this.gameData.quests.find((entry) => entry.id === questId);
+      const isDirectMatch = quest ? this.questMatchesSearch(quest) : false;
+      const isRelatedMatch = quest ? this.questHasMatchingRelation(quest) : false;
+
+      element.classList.toggle('quest-card__tick--search-match', isDirectMatch);
+      element.classList.toggle('quest-card__tick--search-related', !isDirectMatch && isRelatedMatch);
+    });
+  }
+
+  private hasQuestItemRequirements(quest: Quest): boolean {
+    if (!Array.isArray(quest.requirements) || quest.requirements.length === 0) {
+      return false;
+    }
+
+    return quest.requirements.some((requirement) => {
+      const itemId = requirement.item_id;
+      return typeof itemId === 'string' && itemId.length > 0;
+    });
+  }
+
+  private hasQuestRequirementImage(quest: Quest): boolean {
+    if (!Array.isArray(quest.requirements) || quest.requirements.length === 0) {
+      return false;
+    }
+
+    return quest.requirements.some((requirement) => {
+      const itemId = requirement.item_id;
+      if (typeof itemId !== 'string' || itemId.length === 0) {
+        return false;
+      }
+
+      const item = this.gameData.items.find((entry) => entry.id === itemId);
+      if (!item) {
+        return false;
+      }
+
+      return typeof item.imageFilename === 'string' && item.imageFilename.trim().length > 0;
+    });
   }
 
   private applyFilters() {

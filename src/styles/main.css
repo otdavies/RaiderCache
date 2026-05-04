@@ -890,6 +890,65 @@ body.compact-mode .container {
   gap: var(--spacing-md);
 }
 
+.quest-tracker-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.quest-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--color-bg-elevated);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-dark);
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.quest-search-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.quest-search-input:focus {
+  outline: none;
+  border-color: rgba(255, 152, 0, 0.7);
+  box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.35);
+}
+
+.quest-toggle-btn {
+  border: 1px solid var(--color-accent-cyan);
+  background: rgba(0, 188, 212, 0.16);
+  color: var(--color-accent-cyan);
+  border-radius: var(--radius-sm);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.quest-toggle-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(0, 188, 212, 0.24);
+}
+
+.quest-toggle-btn.inactive {
+  border-color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-muted);
+}
+
+.quest-toggle-btn.inactive:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .quest-tracker__empty {
   text-align: center;
   padding: var(--spacing-xl);
@@ -979,6 +1038,21 @@ body.compact-mode .container {
 .quest-card__tick.completed {
   background: var(--color-accent-cyan);
   border-color: var(--color-accent-cyan);
+}
+
+.quest-card__tick--search-match {
+  border-color: rgba(255, 152, 0, 0.9) !important;
+  box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.45), 0 0 8px rgba(255, 152, 0, 0.45);
+}
+
+.quest-card__tick--search-related {
+  border-color: rgba(33, 150, 243, 0.85) !important;
+  box-shadow: 0 0 0 1px rgba(33, 150, 243, 0.38), 0 0 8px rgba(33, 150, 243, 0.38);
+}
+
+.quest-card__tick--non-item:not(.completed) {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* Project Tracker */
