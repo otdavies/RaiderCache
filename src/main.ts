@@ -722,22 +722,6 @@ class App {
       const levelText = card.querySelector('.quest-card__level-text') as HTMLSpanElement;
       const ticksContainer = card.querySelector('.quest-card__ticks') as HTMLDivElement;
 
-      // Helper to update UI and save progress
-      const updateProgress = (newValue: number) => {
-        const countText = newValue === quests.length
-          ? `All ${quests.length} Complete`
-          : `${newValue} / ${quests.length}`;
-        levelText.textContent = countText;
-
-        // Update tick visual states
-        ticksContainer.querySelectorAll('.quest-card__tick').forEach((tick, idx) => {
-          tick.classList.toggle('completed', idx < newValue);
-        });
-
-        // Save progress
-        this.updateQuestProgress(trader, quests, newValue);
-      };
-
       // Create tick marks for each quest
       quests.forEach((quest, index) => {
         const tick = document.createElement('div');
@@ -752,13 +736,30 @@ class App {
         tick.addEventListener('mouseenter', (e) => this.showQuestPopover(quest, e));
         tick.addEventListener('mouseleave', () => this.hideQuestPopover());
 
-        // Click to set progress up to this quest
+        // Click to toggle only this quest
         tick.addEventListener('click', () => {
-          const currentlyCompleted = tick.classList.contains('completed');
-          // If clicking on a completed quest, uncomplete from here onwards
-          // If clicking on incomplete quest, complete up to and including this one
-          const newValue = currentlyCompleted ? index : index + 1;
-          updateProgress(newValue);
+          const completedSet = new Set(this.userProgress.completedQuests);
+          if (completedSet.has(quest.id)) {
+            completedSet.delete(quest.id);
+          } else {
+            completedSet.add(quest.id);
+          }
+          this.userProgress.completedQuests = [...completedSet];
+          StorageManager.saveUserProgress(this.userProgress);
+
+          // Update UI for this trader group
+          const newCount = quests.filter(q => completedSet.has(q.id)).length;
+          levelText.textContent = newCount === quests.length
+            ? `All ${quests.length} Complete`
+            : `${newCount} / ${quests.length}`;
+          ticksContainer.querySelectorAll('.quest-card__tick').forEach((t, idx) => {
+            t.classList.toggle('completed', completedSet.has(quests[idx].id));
+          });
+
+          this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
+          this.searchEngine.updateIndex(this.allItems);
+          this.applyFilters();
+          this.updateStats();
         });
 
         ticksContainer.appendChild(tick);
@@ -1106,32 +1107,6 @@ class App {
     if (existing) {
       existing.remove();
     }
-  }
-
-  private updateQuestProgress(_trader: string, quests: any[], completedCount: number) {
-    // Get quest IDs to mark as complete (first N quests)
-    const questsToComplete = quests.slice(0, completedCount).map(q => q.id);
-    const questsToUncomplete = quests.slice(completedCount).map(q => q.id);
-
-    // Update completed quests in user progress
-    const completedSet = new Set(this.userProgress.completedQuests);
-
-    // Add completed quests
-    questsToComplete.forEach(id => completedSet.add(id));
-
-    // Remove uncompleted quests
-    questsToUncomplete.forEach(id => completedSet.delete(id));
-
-    this.userProgress.completedQuests = [...completedSet];
-    StorageManager.saveUserProgress(this.userProgress);
-
-    // Recalculate item decisions
-    this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
-    this.searchEngine.updateIndex(this.allItems);
-
-    // Re-apply filters and render
-    this.applyFilters();
-    this.updateStats();
   }
 
   private applyFilters() {
