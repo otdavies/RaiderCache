@@ -5,9 +5,10 @@ import sharp from 'sharp';
 
 // https://github.com/RaidTheory/arcraiders-data/ is a great source of data.
 
-const METAFORGE_API_BASE = 'https://metaforge.app/api/arc-raiders';
 const RAIDTHEORY_PROJECTS_URL = 'https://raw.githubusercontent.com/RaidTheory/arcraiders-data/refs/heads/main/projects.json';
 const RAIDTHEORY_HIDEOUT_CONTENTS_URL = 'https://api.github.com/repos/RaidTheory/arcraiders-data/contents/hideout';
+const RAIDTHEORY_QUESTS_CONTENTS_URL = 'https://api.github.com/repos/RaidTheory/arcraiders-data/contents/quests';
+const RAIDTHEORY_ITEMS_CONTENTS_URL = 'https://api.github.com/repos/RaidTheory/arcraiders-data/contents/items';
 const SUPABASE_URL = 'https://unhbvkszwhczbjxgetgk.supabase.co/rest/v1';
 // MetaForge's public Supabase anonymous key - this is intentionally public and client-accessible
 // It's visible in their website source code and designed for read-only public API access
@@ -32,36 +33,41 @@ const SKIP_MAP_FETCHES = process.argv.includes('--skip-maps');
   }
 });
 
-interface MetaForgeItem {
+interface RaidTheoryItem {
   id: string;
-  name: string;
-  description?: string;
-  item_type: string;
-  rarity: string;
-  value: number;
-  stat_block: {
-    weight?: number;
-    stackSize?: number;
-    [key: string]: any;
-  };
-  icon?: string;
-  loot_area?: string | null;
-  workbench?: string;
-  updated_at?: string;
-  [key: string]: any;
+  name?: string | Record<string, string>;
+  description?: string | Record<string, string>;
+  type?: string;
+  rarity?: string;
+  value?: number;
+  weightKg?: number;
+  stackSize?: number;
+  imageFilename?: string;
+  foundIn?: string | string[];
+  craftBench?: string;
+  updatedAt?: string;
+  recipe?: Record<string, number>;
+  recyclesInto?: Record<string, number>;
+  salvagesInto?: Record<string, number>;
+  crafting?: Record<string, number>;
+  upgradeCost?: Record<string, number>;
+  effects?: Array<{ label?: string; value?: string | number }>;
 }
 
-interface MetaForgeQuest {
+interface RaidTheoryQuest {
   id: string;
-  name: string;
-  objectives?: string[];
-  required_items?: any[];
-  rewards?: any;
-  trader_name?: string;
+  name?: string | Record<string, string>;
+  description?: string | Record<string, string>;
+  objectives?: Array<string | Record<string, string>>;
+  requiredItemIds?: Array<{ itemId?: string; item_id?: string; quantity?: number }>;
+  rewardItemIds?: Array<{ itemId?: string; item_id?: string; quantity?: number }>;
+  grantedItemIds?: Array<{ itemId?: string; item_id?: string; quantity?: number }>;
+  otherRequirements?: Array<string | { type?: string; value?: number | string }>;
+  trader?: string;
   xp?: number;
-  sort_order?: number;
-  position?: { x: number; y: number };
-  [key: string]: any;
+  updatedAt?: string;
+  previousQuestIds?: string[];
+  nextQuestIds?: string[];
 }
 
 interface ProjectRequirement {
@@ -112,18 +118,6 @@ interface GitHubContentEntry {
   name: string;
   type: 'file' | 'dir';
   download_url: string | null;
-}
-
-interface MetaForgePaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
 }
 
 interface SupabaseComponent {
@@ -297,37 +291,6 @@ function saveResizedIcons(resizedIcons: Set<string>): void {
   fs.writeFileSync(RESIZED_MARKER, JSON.stringify(Array.from(resizedIcons), null, 2));
 }
 
-async function fetchJSON<T>(url: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    https.get(url, (response) => {
-      let data = '';
-
-      if (response.statusCode === 302 || response.statusCode === 301) {
-        if (response.headers.location) {
-          fetchJSON<T>(response.headers.location).then(resolve).catch(reject);
-        } else {
-          reject(new Error('Redirect without location'));
-        }
-        return;
-      }
-
-      if (response.statusCode !== 200) {
-        reject(new Error(`HTTP ${response.statusCode}`));
-        return;
-      }
-
-      response.on('data', chunk => data += chunk);
-      response.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          reject(e);
-        }
-      });
-    }).on('error', reject);
-  });
-}
-
 async function fetchJSONWithTimeout<T>(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<T> {
   return new Promise((resolve, reject) => {
     const request = https.get(url, { headers }, (response) => {
@@ -374,7 +337,7 @@ function normalizeProjectRequirement(req: any): ProjectRequirement | null {
   }
 
   // RaidTheory project data uses snake_case IDs while our item dataset uses kebab-case IDs.
-  const normalizedItemId = itemId.trim().replace(/_/g, '-');
+  const normalizedItemId = normalizeItemId(itemId);
   if (!normalizedItemId) {
     return null;
   }
@@ -396,7 +359,7 @@ function normalizeHideoutRequirement(req: any): HideoutRequirement | null {
     return null;
   }
 
-  const normalizedItemId = itemId.trim().replace(/_/g, '-');
+  const normalizedItemId = normalizeItemId(itemId);
   if (!normalizedItemId) {
     return null;
   }
@@ -448,6 +411,81 @@ function normalizePhaseName(value: any): string | undefined {
     }
   }
   return undefined;
+}
+
+function normalizeItemId(value: string): string {
+  return value.trim().replace(/_/g, '-');
+}
+
+function normalizeItemRecord(value: unknown): Record<string, number> | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>)
+    .map(([key, qty]) => {
+      const itemId = normalizeItemId(key);
+      const quantity = Number(qty);
+      if (!itemId || !Number.isFinite(quantity) || quantity <= 0) {
+        return null;
+      }
+      return [itemId, quantity] as const;
+    })
+    .filter((entry): entry is readonly [string, number] => entry !== null);
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(entries);
+}
+
+const WEAPON_TYPES = new Set(['Assault Rifle', 'Battle Rifle', 'Sniper Rifle', 'Hand Cannon', 'SMG', 'Pistol', 'Shotgun', 'LMG', 'Special' /* Only Aphelion and Hullcracker rifles have type special */]);
+
+function normalizeItemType(type?: string): string {
+  if (!type) return 'Unknown';
+  return WEAPON_TYPES.has(type) ? 'weapon' : type;
+}
+
+function mapRaidTheoryItemToOurFormat(
+  item: RaidTheoryItem,
+  craftingMap: Map<string, Record<string, number>>,
+  recycleMap: Map<string, Record<string, number>>
+): any {
+  const normalizedId = normalizeItemId(item.id);
+  const foundIn = Array.isArray(item.foundIn)
+    ? item.foundIn
+    : typeof item.foundIn === 'string'
+      ? item.foundIn.split(',').map(v => v.trim()).filter(Boolean)
+      : [];
+
+  return {
+    id: normalizedId,
+    name: normalizePhaseName(item.name) || normalizedId,
+    description: normalizePhaseName(item.description) || '',
+    type: normalizeItemType(item.type),
+    rarity: item.rarity ? item.rarity.toLowerCase() : 'common',
+    value: Number.isFinite(Number(item.value)) ? Number(item.value) : 0,
+    weightKg: Number.isFinite(Number(item.weightKg)) ? Number(item.weightKg) : 0,
+    stackSize: Number.isFinite(Number(item.stackSize)) && Number(item.stackSize) > 0 ? Number(item.stackSize) : 1,
+    imageFilename: item.imageFilename,
+    foundIn,
+    craftBench: item.craftBench || undefined,
+    updatedAt: item.updatedAt || new Date().toISOString(),
+    recipe: normalizeItemRecord(item.recipe) || craftingMap.get(normalizedId) || undefined,
+    recyclesInto: normalizeItemRecord(item.recyclesInto) || recycleMap.get(normalizedId) || undefined,
+    salvagesInto: normalizeItemRecord(item.salvagesInto),
+    crafting: normalizeItemRecord(item.crafting),
+    upgradeCost: normalizeItemRecord(item.upgradeCost),
+    effects: Array.isArray(item.effects)
+      ? item.effects
+        .map(effect => ({
+          label: normalizePhaseName(effect?.label) || '',
+          value: effect?.value ?? ''
+        }))
+        .filter(effect => effect.label && effect.value !== '')
+      : undefined
+  };
 }
 
 function normalizeModuleName(value: any): string {
@@ -659,71 +697,197 @@ async function fetchSupabase<T>(table: string, params: string = ''): Promise<T> 
   });
 }
 
-async function fetchAllItems(): Promise<MetaForgeItem[]> {
-  console.log('📥 Fetching items from MetaForge API (with pagination)...');
+async function fetchRaidTheoryItems(
+  craftingMap: Map<string, Record<string, number>>,
+  recycleMap: Map<string, Record<string, number>>
+): Promise<any[]> {
+  console.log('📥 Fetching items from RaidTheory...');
 
-  const allItems: MetaForgeItem[] = [];
-  let currentPage = 1;
-  let hasNextPage = true;
-  const limit = 100; // Fetch 100 items per page
-
-  while (hasNextPage) {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= GITHUB_FETCH_RETRIES; attempt++) {
     try {
-      const url = `${METAFORGE_API_BASE}/items?page=${currentPage}&limit=${limit}`;
-      console.log(`  Fetching page ${currentPage}...`);
+      console.log(`  Attempt ${attempt}/${GITHUB_FETCH_RETRIES}...`);
+      const entries = await fetchJSONWithTimeout<GitHubContentEntry[]>(
+        RAIDTHEORY_ITEMS_CONTENTS_URL,
+        GITHUB_FETCH_TIMEOUT_MS,
+        {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'RaiderCache-Fetcher'
+        }
+      );
 
-      const response = await fetchJSON<MetaForgePaginatedResponse<MetaForgeItem>>(url);
-      allItems.push(...response.data);
+      const itemFiles = entries
+        .filter(entry => entry.type === 'file' && entry.name.endsWith('.json') && !!entry.download_url)
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-      hasNextPage = response.pagination.hasNextPage;
-      currentPage++;
-
-      console.log(`  ✅ Page ${currentPage - 1}: ${response.data.length} items (Total so far: ${allItems.length}/${response.pagination.total})`);
-
-      // Rate limiting: wait 500ms between requests to be respectful
-      if (hasNextPage) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (itemFiles.length === 0) {
+        throw new Error('No item JSON files found in RaidTheory repository');
       }
+
+      const rawItems = await Promise.all(
+        itemFiles.map(async (file) => fetchJSONWithTimeout<RaidTheoryItem>(
+          file.download_url as string,
+          GITHUB_FETCH_TIMEOUT_MS
+        ))
+      );
+
+      const mappedItems = rawItems
+        .filter((item): item is RaidTheoryItem => !!item && typeof item.id === 'string' && item.id.length > 0)
+        .map(item => mapRaidTheoryItemToOurFormat(item, craftingMap, recycleMap));
+
+      console.log(`✅ Fetched ${mappedItems.length} items from RaidTheory`);
+      return mappedItems;
     } catch (error) {
-      console.error(`  ❌ Failed to fetch page ${currentPage}:`, error);
-      hasNextPage = false;
+      lastError = error;
+      console.warn(`  ⚠️  Attempt ${attempt} failed: ${error}`);
+      if (attempt < GITHUB_FETCH_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+      }
     }
   }
 
-  console.log(`✅ Total items fetched: ${allItems.length}`);
-  return allItems;
+  throw new Error(`Failed to fetch RaidTheory items after ${GITHUB_FETCH_RETRIES} attempts: ${lastError}`);
 }
 
-async function fetchAllQuests(): Promise<MetaForgeQuest[]> {
-  console.log('📥 Fetching quests from MetaForge API...');
+function normalizeQuestItemRef(req: { itemId?: string; item_id?: string; quantity?: number } | null | undefined) {
+  if (!req) {
+    return null;
+  }
 
-  const allQuests: MetaForgeQuest[] = [];
-  let currentPage = 1;
-  let hasNextPage = true;
-  const limit = 100;
+  const rawItemId = req.itemId ?? req.item_id;
+  if (typeof rawItemId !== 'string' || rawItemId.length === 0) {
+    return null;
+  }
 
-  while (hasNextPage) {
+  // RaidTheory quest item IDs use snake_case while our item data uses kebab-case.
+  const item_id = normalizeItemId(rawItemId);
+  if (!item_id) {
+    return null;
+  }
+
+  const quantity = Number(req.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return null;
+  }
+
+  return { item_id, quantity };
+}
+
+function mapRaidTheoryQuestToOurFormat(raidTheoryQuest: RaidTheoryQuest, index: number) {
+  const normalizedRequirements = [
+    ...(Array.isArray(raidTheoryQuest.requiredItemIds)
+      ? raidTheoryQuest.requiredItemIds
+        .map(normalizeQuestItemRef)
+        .filter((req): req is { item_id: string; quantity: number } => req !== null)
+      : []),
+    ...(Array.isArray(raidTheoryQuest.otherRequirements)
+      ? raidTheoryQuest.otherRequirements
+        .map((entry) => {
+          if (typeof entry === 'string') {
+            const trimmed = entry.trim();
+            return trimmed ? { type: 'other', value: trimmed } : null;
+          }
+
+          if (entry && typeof entry === 'object' && typeof entry.type === 'string') {
+            return entry.value === undefined
+              ? { type: entry.type }
+              : { type: entry.type, value: entry.value };
+          }
+
+          return null;
+        })
+        .filter((req): req is { type: string; value?: number | string } => req !== null)
+      : [])
+  ];
+
+  const objectives = Array.isArray(raidTheoryQuest.objectives)
+    ? raidTheoryQuest.objectives
+      .map((objective) => normalizePhaseName(objective))
+      .filter((objective): objective is string => typeof objective === 'string' && objective.length > 0)
+    : [];
+
+  const rewards = [
+    ...(Array.isArray(raidTheoryQuest.rewardItemIds)
+      ? raidTheoryQuest.rewardItemIds
+        .map(normalizeQuestItemRef)
+        .filter((reward): reward is { item_id: string; quantity: number } => reward !== null)
+      : []),
+    ...(Array.isArray(raidTheoryQuest.grantedItemIds)
+      ? raidTheoryQuest.grantedItemIds
+        .map(normalizeQuestItemRef)
+        .filter((reward): reward is { item_id: string; quantity: number } => reward !== null)
+      : [])
+  ];
+
+  return {
+    id: raidTheoryQuest.id,
+    name: normalizePhaseName(raidTheoryQuest.name) || raidTheoryQuest.id,
+    description: normalizePhaseName(raidTheoryQuest.description),
+    objectives,
+    requirements: normalizedRequirements,
+    rewards,
+    rewardItemIds: rewards,
+    trader: typeof raidTheoryQuest.trader === 'string' && raidTheoryQuest.trader.length > 0
+      ? raidTheoryQuest.trader
+      : 'Unknown',
+    xp: Number.isFinite(Number(raidTheoryQuest.xp)) ? Number(raidTheoryQuest.xp) : 0,
+    sortOrder: index,
+    updatedAt: raidTheoryQuest.updatedAt,
+    previousQuestIds: Array.isArray(raidTheoryQuest.previousQuestIds) ? raidTheoryQuest.previousQuestIds : [],
+    nextQuestIds: Array.isArray(raidTheoryQuest.nextQuestIds) ? raidTheoryQuest.nextQuestIds : []
+  };
+}
+
+async function fetchRaidTheoryQuests(): Promise<any[]> {
+  console.log('📥 Fetching quests from RaidTheory...');
+
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= GITHUB_FETCH_RETRIES; attempt++) {
     try {
-      const url = `${METAFORGE_API_BASE}/quests?page=${currentPage}&limit=${limit}`;
-      const response = await fetchJSON<MetaForgePaginatedResponse<MetaForgeQuest>>(url);
-      allQuests.push(...response.data);
+      console.log(`  Attempt ${attempt}/${GITHUB_FETCH_RETRIES}...`);
+      const entries = await fetchJSONWithTimeout<GitHubContentEntry[]>(
+        RAIDTHEORY_QUESTS_CONTENTS_URL,
+        GITHUB_FETCH_TIMEOUT_MS,
+        {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'RaiderCache-Fetcher'
+        }
+      );
 
-      hasNextPage = response.pagination.hasNextPage;
-      currentPage++;
+      const questFiles = entries
+        .filter(entry => entry.type === 'file' && entry.name.endsWith('.json') && !!entry.download_url)
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-      console.log(`  ✅ Page ${currentPage - 1}: ${response.data.length} quests (Total so far: ${allQuests.length})`);
-
-      if (hasNextPage) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (questFiles.length === 0) {
+        throw new Error('No quest JSON files found in RaidTheory repository');
       }
+
+      const rawQuests = await Promise.all(
+        questFiles.map(async (file) => fetchJSONWithTimeout<RaidTheoryQuest>(
+          file.download_url as string,
+          GITHUB_FETCH_TIMEOUT_MS
+        ))
+      );
+
+      const questsWithRequiredItemIds = rawQuests.filter(
+        (quest) => Array.isArray(quest.requiredItemIds) && quest.requiredItemIds.length > 0
+      );
+
+      const mappedQuests = questsWithRequiredItemIds
+        .map((quest, index) => mapRaidTheoryQuestToOurFormat(quest, index));
+
+      console.log(`✅ Fetched ${mappedQuests.length} quests from RaidTheory`);
+      return mappedQuests;
     } catch (error) {
-      console.error(`  ❌ Failed to fetch quests page ${currentPage}:`, error);
-      hasNextPage = false;
+      lastError = error;
+      console.warn(`  ⚠️  Attempt ${attempt} failed: ${error}`);
+      if (attempt < GITHUB_FETCH_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+      }
     }
   }
 
-  console.log(`✅ Total quests fetched: ${allQuests.length}`);
-  return allQuests;
+  throw new Error(`Failed to fetch RaidTheory quests after ${GITHUB_FETCH_RETRIES} attempts: ${lastError}`);
 }
 
 async function fetchAllCraftingComponents(): Promise<Map<string, Record<string, number>>> {
@@ -1383,57 +1547,11 @@ async function calculateMapExtents(): Promise<void> {
   console.log(`\n✅ Map extents saved to ${configPath}`);
 }
 
-function mapMetaForgeItemToOurFormat(
-  metaforgeItem: MetaForgeItem,
-  craftingMap: Map<string, Record<string, number>>,
-  recycleMap: Map<string, Record<string, number>>
-): any {
-  // Map MetaForge item structure to our Item interface
-  return {
-    id: metaforgeItem.id,
-    name: metaforgeItem.name, // Now just a string (English only)
-    description: metaforgeItem.description || '',
-    type: metaforgeItem.item_type || 'Unknown',
-    rarity: metaforgeItem.rarity ? metaforgeItem.rarity.toLowerCase() : 'common',
-    value: metaforgeItem.value || 0,
-    weightKg: metaforgeItem.stat_block?.weight || 0,
-    stackSize: metaforgeItem.stat_block?.stackSize || 1,
-    imageFilename: metaforgeItem.id + '.png', // We'll convert WebP to PNG
-    foundIn: metaforgeItem.loot_area
-      ? metaforgeItem.loot_area.split(',').map(s => s.trim()).filter(s => s)
-      : [],
-    craftBench: metaforgeItem.workbench || undefined,
-    updatedAt: metaforgeItem.updated_at || new Date().toISOString(),
-    // Crafting and recycling data from Supabase
-    recipe: craftingMap.get(metaforgeItem.id) || undefined,
-    recyclesInto: recycleMap.get(metaforgeItem.id) || undefined,
-  };
-}
-
-function mapMetaForgeQuestToOurFormat(metaforgeQuest: MetaForgeQuest): any {
-  // Use position.y for sort order (lower y = earlier in quest progression)
-  const sortOrder = metaforgeQuest.position?.y ?? metaforgeQuest.sort_order ?? 0;
-
-  return {
-    id: metaforgeQuest.id,
-    name: metaforgeQuest.name,
-    objectives: metaforgeQuest.objectives || [],
-    requirements: metaforgeQuest.required_items || [],
-    rewards: metaforgeQuest.rewards || [],
-    trader: metaforgeQuest.trader_name || 'Unknown',
-    xp: metaforgeQuest.xp || 0,
-    sortOrder: sortOrder,
-  };
-}
-
 async function main() {
-  console.log('🚀 Fetching Arc Raiders data from MetaForge API...\n');
+  console.log('🚀 Fetching Arc Raiders data...\n');
   if (SKIP_MAP_FETCHES) {
     console.log('⏭️  Map fetching disabled via --skip-maps');
   }
-
-  // Fetch items from MetaForge API
-  const metaforgeItems = await fetchAllItems();
 
   // Fetch crafting and recycling data from Supabase (with rate limiting)
   console.log('\n📥 Fetching crafting and recycling data from Supabase...');
@@ -1443,10 +1561,8 @@ async function main() {
     fetchAllRecycleComponents()
   ]);
 
-  // Map items with crafting/recycling data
-  const mappedItems = metaforgeItems.map(item =>
-    mapMetaForgeItemToOurFormat(item, craftingMap, recycleMap)
-  );
+  // Fetch and map items from RaidTheory (fallback to Supabase recipe/recycle maps when absent)
+  const mappedItems = await fetchRaidTheoryItems(craftingMap, recycleMap);
 
   // Save items.json
   console.log('\n💾 Saving items.json...');
@@ -1456,9 +1572,8 @@ async function main() {
   );
   console.log(`✅ Saved ${mappedItems.length} items to items.json`);
 
-  // Fetch quests from MetaForge
-  const metaforgeQuests = await fetchAllQuests();
-  const mappedQuests = metaforgeQuests.map(mapMetaForgeQuestToOurFormat);
+  // Fetch quests from RaidTheory
+  const mappedQuests = await fetchRaidTheoryQuests();
 
   // Save quests.json
   console.log('\n💾 Saving quests.json...');
@@ -1576,9 +1691,13 @@ async function main() {
   let skippedIcons = 0;
   let conversionFailedCount = 0;
 
-  for (const item of metaforgeItems) {
-    if (item.icon) {
-      const filename = item.id + '.png';
+  for (const item of mappedItems) {
+    if (typeof item.imageFilename === 'string' && item.imageFilename.startsWith('http')) {
+      const iconUrl = item.imageFilename;
+      const filenameFromUrl = iconUrl.split('/').pop();
+      const filename = (filenameFromUrl && filenameFromUrl.endsWith('.png'))
+        ? filenameFromUrl
+        : `${item.id}.png`;
       const iconPath = path.join(ICONS_DIR, filename);
 
       try {
@@ -1588,8 +1707,8 @@ async function main() {
           continue;
         }
 
-        // Convert WebP to PNG
-        const success = await convertWebPToPNG(item.icon, iconPath);
+        // Convert source image to normalized PNG
+        const success = await convertWebPToPNG(iconUrl, iconPath);
         if (success) {
           resizedIcons.add(filename);
           downloadedIcons++;
@@ -1620,7 +1739,7 @@ async function main() {
   // Create metadata file
   const metadata = {
     lastUpdated: new Date().toISOString(),
-    source: 'https://metaforge.app/arc-raiders (items, quests, maps), https://raw.githubusercontent.com/RaidTheory/arcraiders-data/refs/heads/main/projects.json (projects), https://api.github.com/repos/RaidTheory/arcraiders-data/contents/hideout (hideout modules)',
+    source: 'https://api.github.com/repos/RaidTheory/arcraiders-data/contents/items (items), https://api.github.com/repos/RaidTheory/arcraiders-data/contents/quests (quests), https://metaforge.app/arc-raiders (maps), https://raw.githubusercontent.com/RaidTheory/arcraiders-data/refs/heads/main/projects.json (projects), https://api.github.com/repos/RaidTheory/arcraiders-data/contents/hideout (hideout modules)',
     staticSource: 'Local static files (projects fallback only)',
     version: '2.2.0',
     itemCount: mappedItems.length,
@@ -1653,7 +1772,6 @@ async function main() {
   console.log(`📌 Hideout source: ${metadata.hideoutSource}`);
   console.log(`🗺️  Total maps: ${metadata.mapCount}`);
   console.log(`📍 Total map markers: ${metadata.mapMarkerCount}`);
-  console.log(`\nℹ️  Note: Hideout modules and projects are fetched from RaidTheory. Projects retain a local static fallback.`);
 
   // Force exit - Sharp's thread pool can keep Node alive
   process.exit(0);
