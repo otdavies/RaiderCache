@@ -34,7 +34,7 @@ export class ItemCard {
     card.innerHTML = `
       <div class="item-card__header">
         <div class="item-card__rarity-badge">${this.getRarityLabel(item.rarity)}</div>
-        <button class="item-card__favorite ${this.isFavorite ? 'active' : ''}" data-action="favorite">
+        <button class="item-card__favorite ${this.isFavorite ? 'active' : ''}" data-action="favorite" aria-label="Toggle favorite">
           <span class="favorite-icon">${this.isFavorite ? '★' : '☆'}</span>
         </button>
       </div>
@@ -53,11 +53,15 @@ export class ItemCard {
         <h3 class="item-card__name">${itemName}</h3>
 
         <div class="item-card__meta">
-          <span class="item-card__value">${itemValue} <span class="coin-icon">⚡</span></span>
+          <span class="item-card__value">${itemValue} <span class="coin-icon">$</span></span>
+          <span class="decision-badge decision-badge--${decisionData.decision} decision-badge--compact" aria-label="${this.getDecisionLabel(decisionData.decision)}" title="${this.getDecisionLabel(decisionData.decision)}">
+            <span class="decision-badge__icon">${this.getDecisionIcon(decisionData.decision)}</span>
+            <span class="decision-badge__text">${this.getDecisionLabel(decisionData.decision)}</span>
+          </span>
           ${stackSize > 1 ? `<span class="item-card__stack">x${stackSize}</span>` : ''}
         </div>
 
-        <div class="decision-badge decision-badge--${decisionData.decision}">
+        <div class="decision-badge decision-badge--${decisionData.decision} decision-badge--full">
           <span class="decision-badge__icon">${this.getDecisionIcon(decisionData.decision)}</span>
           <span class="decision-badge__text">${this.getDecisionLabel(decisionData.decision)}</span>
         </div>
@@ -80,6 +84,11 @@ export class ItemCard {
     return card;
   }
 
+  private getRarityLabel(rarity: string | undefined): string {
+    if (!rarity) return 'Common';
+    return rarity.charAt(0).toUpperCase() + rarity.slice(1);
+  }
+
   private toggleFavorite(): void {
     this.isFavorite = StorageManager.toggleFavorite(this.config.item.id);
 
@@ -95,11 +104,6 @@ export class ItemCard {
         favoriteIcon.textContent = this.isFavorite ? '★' : '☆';
       }
     }
-  }
-
-  private getRarityLabel(rarity: string | undefined): string {
-    if (!rarity) return 'Common';
-    return rarity.charAt(0).toUpperCase() + rarity.slice(1);
   }
 
   private getDecisionIcon(decision: RecycleDecision): string {

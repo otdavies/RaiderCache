@@ -29,7 +29,7 @@ class App {
     rarities: new Set<string>(),
     categories: new Map<string, 'include' | 'exclude'>(),
     zones: [] as string[],
-    sortBy: 'name' as 'name' | 'value' | 'rarity' | 'weight' | 'decision',
+    sortBy: 'name' as 'name' | 'value' | 'rarity' | 'weight' | 'decision' | 'type',
     sortDirection: 'asc' as 'asc' | 'desc'
   };
 
@@ -137,6 +137,9 @@ class App {
 
     // Initialize mobile menu
     this.initializeMobileMenu();
+
+    // Initialize sidebar toggle
+    this.initializeSidebarToggle();
   }
 
   private initializeDecisionFilters() {
@@ -348,34 +351,72 @@ class App {
   }
 
   private initializeViewToggle() {
-    const toggleBtns = document.querySelectorAll('.toggle-btn');
+    const desktopViewBtns = document.querySelectorAll<HTMLButtonElement>('.toggle-btn[data-view]');
+    const mobileViewBtns = document.querySelectorAll<HTMLButtonElement>('.mobile-view-btn[data-view]');
     const isMobile = window.innerWidth <= 768;
 
-    // Set default view based on screen size
-    if (isMobile) {
-      this.itemsGrid.classList.add('list-view');
-      toggleBtns.forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.getAttribute('data-view') === 'list') {
-          btn.classList.add('active');
-        }
+    const setView = (view: 'grid' | 'list' | 'compact') => {
+      this.itemsGrid.classList.toggle('list-view', view === 'list');
+      this.itemsGrid.classList.toggle('compact-view', view === 'compact');
+      document.body.classList.toggle('compact-mode', view === 'compact');
+      StorageManager.saveViewMode(view);
+
+      desktopViewBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
       });
+
+      mobileViewBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+      });
+    };
+
+    // Restore last selected view if present, otherwise default by screen size.
+    const savedView = StorageManager.loadViewMode();
+    if (savedView) {
+      setView(savedView);
+    } else if (isMobile) {
+      setView('list');
+    } else {
+      setView('grid');
     }
 
-    toggleBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        const view = target.dataset.view;
-
-        toggleBtns.forEach(b => b.classList.remove('active'));
-        target.classList.add('active');
-
-        if (view === 'list') {
-          this.itemsGrid.classList.add('list-view');
-        } else {
-          this.itemsGrid.classList.remove('list-view');
+    desktopViewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        if (view === 'grid' || view === 'list' || view === 'compact') {
+          setView(view);
         }
       });
+    });
+
+    mobileViewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        if (view === 'grid' || view === 'list' || view === 'compact') {
+          setView(view);
+        }
+      });
+    });
+  }
+
+  private initializeSidebarToggle() {
+    const btn = document.getElementById('sidebar-toggle');
+    const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
+    const wrapper = document.querySelector('.layout-wrapper') as HTMLElement | null;
+    if (!btn || !sidebar || !wrapper) return;
+
+    const setHidden = (hidden: boolean) => {
+      wrapper.classList.toggle('sidebar-hidden', hidden);
+      btn.textContent = hidden ? '\u25b6' : '\u25c0';
+      btn.title = hidden ? 'Show sidebar' : 'Hide sidebar';
+      StorageManager.saveSidebarHidden(hidden);
+    };
+
+    // Restore persisted state
+    setHidden(StorageManager.loadSidebarHidden());
+
+    btn.addEventListener('click', () => {
+      setHidden(!wrapper.classList.contains('sidebar-hidden'));
     });
   }
 
@@ -384,7 +425,6 @@ class App {
     const dropdown = document.getElementById('mobile-menu-dropdown');
     const filtersBtn = document.getElementById('mobile-filters-btn');
     const mobileSortSelect = document.getElementById('mobile-sort-selector') as HTMLSelectElement;
-    const mobileViewBtns = document.querySelectorAll('.mobile-view-btn');
     const sidebar = document.querySelector('.sidebar');
 
     if (!menuBtn || !dropdown) return;
@@ -441,38 +481,6 @@ class App {
       });
     }
 
-    // Mobile view toggle
-    mobileViewBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const view = (btn as HTMLElement).dataset.view;
-
-        mobileViewBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        // Sync with desktop toggle
-        const desktopBtns = document.querySelectorAll('.toggle-btn');
-        desktopBtns.forEach(b => {
-          b.classList.remove('active');
-          if ((b as HTMLElement).dataset.view === view) {
-            b.classList.add('active');
-          }
-        });
-
-        if (view === 'list') {
-          this.itemsGrid.classList.add('list-view');
-        } else {
-          this.itemsGrid.classList.remove('list-view');
-        }
-      });
-    });
-
-    // Set initial active state for mobile view buttons (always list on mobile)
-    mobileViewBtns.forEach(btn => {
-      btn.classList.remove('active');
-      if ((btn as HTMLElement).dataset.view === 'list') {
-        btn.classList.add('active');
-      }
-    });
   }
 
   private initializeWorkshopTracker() {
@@ -1222,6 +1230,10 @@ class App {
           const decisionA = decisionOrder[a.decisionData.decision as keyof typeof decisionOrder] || 0;
           const decisionB = decisionOrder[b.decisionData.decision as keyof typeof decisionOrder] || 0;
           result = decisionA - decisionB;
+          break;
+
+        case 'type':
+          result = (a.type || '').localeCompare(b.type || '');
           break;
 
         default:

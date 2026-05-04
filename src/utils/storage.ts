@@ -7,10 +7,13 @@ const STORAGE_KEYS = {
   USER_PROGRESS: 'arc_raiders_user_progress',
   FAVORITES: 'arc_raiders_favorites',
   CATEGORY_FILTERS: 'arc_raiders_category_filters',
-  PVP_GATE: 'arc_raiders_pvp_gate'
+  PVP_GATE: 'arc_raiders_pvp_gate',
+  VIEW_MODE: 'arc_raiders_view_mode',
+  SIDEBAR_HIDDEN: 'arc_raiders_sidebar_hidden'
 } as const;
 
 export type CategoryFilterState = Record<string, 'include' | 'exclude'>;
+export type ViewMode = 'grid' | 'list' | 'compact';
 
 export class StorageManager {
   /**
@@ -214,6 +217,45 @@ export class StorageManager {
       localStorage.setItem(STORAGE_KEYS.PVP_GATE, JSON.stringify(answer));
     } catch (error) {
       console.error('Failed to save PvP gate answer:', error);
+    }
+  }
+
+  static loadViewMode(): ViewMode | null {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.VIEW_MODE);
+      if (stored) {
+        const parsed = JSON.parse(stored) as unknown;
+        if (parsed === 'grid' || parsed === 'list' || parsed === 'compact') {
+          return parsed;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load view mode:', error);
+    }
+    return null;
+  }
+
+  static saveViewMode(mode: ViewMode): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.VIEW_MODE, JSON.stringify(mode));
+    } catch (error) {
+      console.error('Failed to save view mode:', error);
+    }
+  }
+
+  static loadSidebarHidden(): boolean {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.SIDEBAR_HIDDEN) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  static saveSidebarHidden(hidden: boolean): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SIDEBAR_HIDDEN, String(hidden));
+    } catch (error) {
+      console.error('Failed to save sidebar state:', error);
     }
   }
 }
