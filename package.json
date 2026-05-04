@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "fetch-data": "tsx scripts/fetch-data.ts",
+    "fetch-data-quick": "tsx scripts/fetch-data.ts --skip-maps",
     "validate-data": "tsx scripts/validate-data.ts",
     "type-check": "tsc --noEmit"
   },

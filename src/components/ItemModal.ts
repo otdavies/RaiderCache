@@ -580,6 +580,7 @@ export class ItemModal {
     const decisionData = this.config.decisionEngine.getDecision(item, {
       completedQuests: [],
       completedProjects: [],
+      projectPhaseProgress: {},
       hideoutLevels: {},
       lastUpdated: Date.now()
     });

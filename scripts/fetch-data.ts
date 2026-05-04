@@ -3,7 +3,11 @@ import * as path from 'path';
 import * as https from 'https';
 import sharp from 'sharp';
 
+// https://github.com/RaidTheory/arcraiders-data/ is a great source of data.
+
 const METAFORGE_API_BASE = 'https://metaforge.app/api/arc-raiders';
+const RAIDTHEORY_PROJECTS_URL = 'https://raw.githubusercontent.com/RaidTheory/arcraiders-data/refs/heads/main/projects.json';
+const RAIDTHEORY_HIDEOUT_CONTENTS_URL = 'https://api.github.com/repos/RaidTheory/arcraiders-data/contents/hideout';
 const SUPABASE_URL = 'https://unhbvkszwhczbjxgetgk.supabase.co/rest/v1';
 // MetaForge's public Supabase anonymous key - this is intentionally public and client-accessible
 // It's visible in their website source code and designed for read-only public API access
@@ -17,6 +21,9 @@ const ICONS_DIR = path.join(PUBLIC_DIR, 'assets', 'icons');
 const MAPS_DIR = path.join(PUBLIC_DIR, 'assets', 'maps');
 const TILES_DIR = path.join(MAPS_DIR, 'tiles');
 const RESIZED_MARKER = path.join(ICONS_DIR, '.resized');
+const GITHUB_FETCH_TIMEOUT_MS = 15000;
+const GITHUB_FETCH_RETRIES = 3;
+const SKIP_MAP_FETCHES = process.argv.includes('--skip-maps');
 
 // Ensure directories exist
 [PUBLIC_DIR, DATA_DIR, STATIC_DATA_DIR, ICONS_DIR, MAPS_DIR, TILES_DIR].forEach(dir => {
@@ -55,6 +62,56 @@ interface MetaForgeQuest {
   sort_order?: number;
   position?: { x: number; y: number };
   [key: string]: any;
+}
+
+interface ProjectRequirement {
+  item_id: string;
+  quantity: number;
+}
+
+interface ProjectPhase {
+  phase: number;
+  name?: string;
+  requirementItemIds?: ProjectRequirement[];
+}
+
+interface ProjectData {
+  id: string;
+  name: string;
+  description?: string;
+  requirements?: ProjectRequirement[];
+  phases?: ProjectPhase[];
+  unlocks?: string[];
+}
+
+interface HideoutRequirement {
+  item_id: string;
+  quantity: number;
+}
+
+interface HideoutOtherRequirement {
+  type: string;
+  value: number;
+}
+
+interface HideoutLevel {
+  level: number;
+  requirementItemIds: HideoutRequirement[];
+  otherRequirements?: HideoutOtherRequirement[];
+  description?: string;
+}
+
+interface HideoutModuleData {
+  id: string;
+  name: string;
+  maxLevel: number;
+  levels: HideoutLevel[];
+}
+
+interface GitHubContentEntry {
+  name: string;
+  type: 'file' | 'dir';
+  download_url: string | null;
 }
 
 interface MetaForgePaginatedResponse<T> {
@@ -98,6 +155,24 @@ interface MapData {
     byCategory: Record<string, number>;
     bySubcategory: Record<string, number>;
   };
+}
+
+function loadExistingMapData(): MapData[] {
+  const mapsPath = path.join(DATA_DIR, 'maps.json');
+  if (!fs.existsSync(mapsPath)) {
+    return [];
+  }
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(mapsPath, 'utf-8')) as unknown;
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw as MapData[];
+  } catch (error) {
+    console.warn(`⚠️  Could not read existing maps.json: ${error}`);
+    return [];
+  }
 }
 
 function downloadFile(url: string, dest: string): Promise<void> {
@@ -251,6 +326,306 @@ async function fetchJSON<T>(url: string): Promise<T> {
       });
     }).on('error', reject);
   });
+}
+
+async function fetchJSONWithTimeout<T>(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, { headers }, (response) => {
+      let data = '';
+
+      if (response.statusCode === 302 || response.statusCode === 301) {
+        if (response.headers.location) {
+          fetchJSONWithTimeout<T>(response.headers.location, timeoutMs).then(resolve).catch(reject);
+        } else {
+          reject(new Error('Redirect without location'));
+        }
+        return;
+      }
+
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+
+      response.on('data', chunk => data += chunk);
+      response.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+
+    request.setTimeout(timeoutMs, () => {
+      request.destroy(new Error(`Request timeout after ${timeoutMs}ms`));
+    });
+
+    request.on('error', reject);
+  });
+}
+
+function normalizeProjectRequirement(req: any): ProjectRequirement | null {
+  const itemId = req?.item_id ?? req?.itemId;
+  const quantityValue = req?.quantity;
+
+  if (typeof itemId !== 'string' || itemId.length === 0) {
+    return null;
+  }
+
+  // RaidTheory project data uses snake_case IDs while our item dataset uses kebab-case IDs.
+  const normalizedItemId = itemId.trim().replace(/_/g, '-');
+  if (!normalizedItemId) {
+    return null;
+  }
+
+  const quantity = Number(quantityValue);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return null;
+  }
+
+  return {
+    item_id: normalizedItemId,
+    quantity
+  };
+}
+
+function normalizeHideoutRequirement(req: any): HideoutRequirement | null {
+  const itemId = req?.item_id ?? req?.itemId;
+  if (typeof itemId !== 'string' || itemId.length === 0) {
+    return null;
+  }
+
+  const normalizedItemId = itemId.trim().replace(/_/g, '-');
+  if (!normalizedItemId) {
+    return null;
+  }
+
+  const quantity = Number(req?.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return null;
+  }
+
+  return {
+    item_id: normalizedItemId,
+    quantity
+  };
+}
+
+function normalizeHideoutOtherRequirements(value: unknown): HideoutOtherRequirement[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const mapped = value
+    .map((entry: any) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const type = typeof entry.type === 'string' ? entry.type : null;
+      const numericValue = Number(entry.value);
+      if (!type || !Number.isFinite(numericValue)) {
+        return null;
+      }
+      return { type, value: numericValue };
+    })
+    .filter((entry): entry is HideoutOtherRequirement => entry !== null);
+
+  return mapped.length > 0 ? mapped : undefined;
+}
+
+function normalizePhaseName(value: any): string | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value && typeof value === 'object') {
+    if (typeof value.en === 'string') {
+      return value.en;
+    }
+    const firstString = Object.values(value).find(v => typeof v === 'string');
+    if (typeof firstString === 'string') {
+      return firstString;
+    }
+  }
+  return undefined;
+}
+
+function normalizeModuleName(value: any): string {
+  return normalizePhaseName(value) || 'Unknown Module';
+}
+
+function mapRaidTheoryProjectToOurFormat(project: any, index: number): ProjectData {
+  const mappedPhases: ProjectPhase[] = Array.isArray(project?.phases)
+    ? project.phases.map((phase: any, phaseIndex: number) => {
+      const requirements = Array.isArray(phase?.requirementItemIds)
+        ? phase.requirementItemIds
+          .map(normalizeProjectRequirement)
+          .filter((req: ProjectRequirement | null): req is ProjectRequirement => req !== null)
+        : [];
+
+      return {
+        phase: Number.isFinite(Number(phase?.phase)) ? Number(phase.phase) : phaseIndex + 1,
+        name: normalizePhaseName(phase?.name),
+        requirementItemIds: requirements
+      };
+    })
+    : [];
+
+  const mappedRequirements: ProjectRequirement[] = Array.isArray(project?.requirements)
+    ? project.requirements
+      .map(normalizeProjectRequirement)
+      .filter((req: ProjectRequirement | null): req is ProjectRequirement => req !== null)
+    : [];
+
+  const description = typeof project?.description === 'string'
+    ? project.description
+    : normalizePhaseName(project?.description);
+
+  return {
+    id: typeof project?.id === 'string' && project.id.length > 0 ? project.id : `project-${index + 1}`,
+    name: normalizePhaseName(project?.name) || `Project ${index + 1}`,
+    description,
+    requirements: mappedRequirements.length > 0 ? mappedRequirements : undefined,
+    phases: mappedPhases.length > 0 ? mappedPhases : undefined,
+    unlocks: Array.isArray(project?.unlocks)
+      ? project.unlocks.filter((u: unknown): u is string => typeof u === 'string')
+      : undefined
+  };
+}
+
+function mapRaidTheoryHideoutToOurFormat(module: any, index: number): HideoutModuleData {
+  const mappedLevels: HideoutLevel[] = Array.isArray(module?.levels)
+    ? module.levels.map((level: any, levelIndex: number) => {
+      const requirementItemIds: HideoutRequirement[] = Array.isArray(level?.requirementItemIds)
+        ? level.requirementItemIds
+          .map(normalizeHideoutRequirement)
+          .filter((req: HideoutRequirement | null): req is HideoutRequirement => req !== null)
+        : [];
+
+      const description = normalizePhaseName(level?.description);
+      const otherRequirements = normalizeHideoutOtherRequirements(level?.otherRequirements);
+
+      return {
+        level: Number.isFinite(Number(level?.level)) ? Number(level.level) : levelIndex + 1,
+        requirementItemIds,
+        otherRequirements,
+        description
+      };
+    })
+    : [];
+
+  return {
+    id: typeof module?.id === 'string' && module.id.length > 0 ? module.id : `hideout-${index + 1}`,
+    name: normalizeModuleName(module?.name),
+    maxLevel: Number.isFinite(Number(module?.maxLevel)) ? Number(module.maxLevel) : mappedLevels.length,
+    levels: mappedLevels
+  };
+}
+
+function isLikelyValidProjectsPayload(payload: unknown): payload is any[] {
+  if (!Array.isArray(payload) || payload.length === 0) {
+    return false;
+  }
+
+  return payload.some(project => {
+    const hasId = typeof project?.id === 'string' && project.id.length > 0;
+    const hasName = typeof project?.name === 'string' || (project?.name && typeof project.name === 'object');
+    const hasPhases = Array.isArray(project?.phases);
+    return hasId && (hasName || hasPhases);
+  });
+}
+
+// Extract expedition number from a project id such as expedition_project, expedition_project_s1, expedition_project_s4
+function expeditionNumber(id: string): number {
+  const match = id.match(/^expedition_project(?:_s(\d+))?$/);
+  if (!match) return -1;
+  return match[1] !== undefined ? Number(match[1]) : 0;
+}
+
+function keepOnlyHighestExpedition(projects: ProjectData[]): ProjectData[] {
+  const expeditions = projects.filter(p => expeditionNumber(p.id) >= 0);
+  if (expeditions.length === 0) return projects;
+  const maxNum = Math.max(...expeditions.map(p => expeditionNumber(p.id)));
+  const highest = expeditions.find(p => expeditionNumber(p.id) === maxNum)!;
+  return projects.filter(p => expeditionNumber(p.id) < 0 || p.id === highest.id);
+}
+
+async function fetchRaidTheoryProjects(): Promise<ProjectData[]> {
+  console.log('📥 Fetching projects from RaidTheory...');
+
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= GITHUB_FETCH_RETRIES; attempt++) {
+    try {
+      console.log(`  Attempt ${attempt}/${GITHUB_FETCH_RETRIES}...`);
+      const payload = await fetchJSONWithTimeout<unknown>(RAIDTHEORY_PROJECTS_URL, GITHUB_FETCH_TIMEOUT_MS);
+
+      if (!isLikelyValidProjectsPayload(payload)) {
+        throw new Error('Invalid projects payload shape');
+      }
+
+      const mappedProjects = payload.map(mapRaidTheoryProjectToOurFormat);
+      const filteredProjects = keepOnlyHighestExpedition(mappedProjects);
+      console.log(`✅ Fetched ${filteredProjects.length} projects from RaidTheory (kept highest expedition only)`);
+      return filteredProjects;
+    } catch (error) {
+      lastError = error;
+      console.warn(`  ⚠️  Attempt ${attempt} failed: ${error}`);
+      if (attempt < GITHUB_FETCH_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+      }
+    }
+  }
+
+  throw new Error(`Failed to fetch RaidTheory projects after ${GITHUB_FETCH_RETRIES} attempts: ${lastError}`);
+}
+
+async function fetchRaidTheoryHideoutModules(): Promise<HideoutModuleData[]> {
+  console.log('📥 Fetching hideout modules from RaidTheory...');
+
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= GITHUB_FETCH_RETRIES; attempt++) {
+    try {
+      console.log(`  Attempt ${attempt}/${GITHUB_FETCH_RETRIES}...`);
+      const entries = await fetchJSONWithTimeout<GitHubContentEntry[]>(
+        RAIDTHEORY_HIDEOUT_CONTENTS_URL,
+        GITHUB_FETCH_TIMEOUT_MS,
+        {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'RaiderCache-Fetcher'
+        }
+      );
+
+      const hideoutFiles = entries
+        .filter(entry => entry.type === 'file' && entry.name.endsWith('.json') && !!entry.download_url)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (hideoutFiles.length === 0) {
+        throw new Error('No hideout JSON files found in RaidTheory repository');
+      }
+
+      const rawModules = await Promise.all(
+        hideoutFiles.map(async (file) => {
+          const moduleJson = await fetchJSONWithTimeout<any>(
+            file.download_url as string,
+            GITHUB_FETCH_TIMEOUT_MS
+          );
+          return moduleJson;
+        })
+      );
+
+      const mappedModules = rawModules.map(mapRaidTheoryHideoutToOurFormat);
+      console.log(`✅ Fetched and combined ${mappedModules.length} hideout modules from RaidTheory`);
+      return mappedModules;
+    } catch (error) {
+      lastError = error;
+      console.warn(`  ⚠️  Attempt ${attempt} failed: ${error}`);
+      if (attempt < GITHUB_FETCH_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+      }
+    }
+  }
+
+  throw new Error(`Failed to fetch RaidTheory hideout modules after ${GITHUB_FETCH_RETRIES} attempts: ${lastError}`);
 }
 
 async function fetchSupabase<T>(table: string, params: string = ''): Promise<T> {
@@ -411,34 +786,45 @@ async function fetchAllMapData(): Promise<MapData[]> {
   const pageSize = 1000;
   let hasMore = true;
 
-  while (hasMore) {
-    const markers = await fetchSupabase<MapMarker[]>(
-      'arc_map_data',
-      `select=map&limit=${pageSize}&offset=${offset}`
-    );
+  try {
+    while (hasMore) {
+      const markers = await fetchSupabase<MapMarker[]>(
+        'arc_map_data',
+        `select=map&limit=${pageSize}&offset=${offset}`
+      );
 
-    console.log(`  📊 Retrieved ${markers.length} records (offset ${offset})...`);
+      console.log(`  📊 Retrieved ${markers.length} records (offset ${offset})...`);
 
-    for (const marker of markers) {
-      if (marker.map) {
-        allMapNames.add(marker.map);
+      for (const marker of markers) {
+        if (marker.map) {
+          allMapNames.add(marker.map);
+        }
+      }
+
+      if (markers.length < pageSize) {
+        hasMore = false;
+      } else {
+        offset += pageSize;
+      }
+
+      // Rate limiting between pages
+      if (hasMore) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-
-    if (markers.length < pageSize) {
-      hasMore = false;
-    } else {
-      offset += pageSize;
-    }
-
-    // Rate limiting between pages
-    if (hasMore) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+  } catch (error) {
+    console.warn(`⚠️  Failed to discover maps from Supabase: ${error}`);
+    console.warn('⚠️  Continuing with empty map data (0 maps).');
+    return [];
   }
 
   const uniqueMaps = [...allMapNames].sort();
   console.log(`  ✅ Found ${uniqueMaps.length} unique maps: ${uniqueMaps.join(', ')}`);
+
+  if (uniqueMaps.length === 0) {
+    console.warn('⚠️  No maps found in Supabase map data. Returning 0 maps.');
+    return [];
+  }
 
   const mapDataArray: MapData[] = [];
 
@@ -1042,6 +1428,9 @@ function mapMetaForgeQuestToOurFormat(metaforgeQuest: MetaForgeQuest): any {
 
 async function main() {
   console.log('🚀 Fetching Arc Raiders data from MetaForge API...\n');
+  if (SKIP_MAP_FETCHES) {
+    console.log('⏭️  Map fetching disabled via --skip-maps');
+  }
 
   // Fetch items from MetaForge API
   const metaforgeItems = await fetchAllItems();
@@ -1079,46 +1468,95 @@ async function main() {
   );
   console.log(`✅ Saved ${mappedQuests.length} quests to quests.json`);
 
-  // Fetch map data from Supabase
-  console.log('\n📥 Fetching map data from Supabase...');
-  await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
-  const mapData = await fetchAllMapData();
+  let mappedProjects: ProjectData[] = [];
+  let projectSource = RAIDTHEORY_PROJECTS_URL;
+  try {
+    mappedProjects = await fetchRaidTheoryProjects();
+  } catch (error) {
+    console.warn(`⚠️  RaidTheory projects fetch failed: ${error}`);
+  }
 
-  // Save map data
-  console.log('\n💾 Saving map data...');
+  console.log('\n💾 Saving projects.json...');
   fs.writeFileSync(
-    path.join(DATA_DIR, 'maps.json'),
-    JSON.stringify(mapData, null, 2)
+    path.join(DATA_DIR, 'projects.json'),
+    JSON.stringify(mappedProjects, null, 2)
   );
-  const totalMapMarkers = mapData.reduce((sum, m) => sum + m.stats.totalMarkers, 0);
-  console.log(`✅ Saved map data with ${totalMapMarkers} markers across ${mapData.length} maps`);
+  console.log(`✅ Saved ${mappedProjects.length} projects to projects.json`);
 
-  // Get map names from Supabase markers
-  const supabaseMaps = mapData.map(m => m.map);
-  console.log(`📍 Maps from Supabase markers: ${supabaseMaps.join(', ') || '(none)'}`);
+  // Fetch and combine hideout modules from all RaidTheory hideout JSON files
+  const mappedHideoutModules = await fetchRaidTheoryHideoutModules();
 
-  // Discover actual available maps by probing the CDN
-  // This is resilient to name changes - we check what actually exists
-  const cdnMaps = await discoverMapsFromCDN(supabaseMaps);
-  console.log(`📍 Maps found on CDN: ${cdnMaps.join(', ') || '(none)'}`);
+  console.log('\n💾 Saving hideoutModules.json...');
+  fs.writeFileSync(
+    path.join(DATA_DIR, 'hideoutModules.json'),
+    JSON.stringify(mappedHideoutModules, null, 2)
+  );
+  console.log(`✅ Saved ${mappedHideoutModules.length} hideout modules to hideoutModules.json`);
 
-  // Use CDN-discovered maps as the source of truth (they're what we can actually download)
-  // Fall back to Supabase names if CDN discovery fails completely
-  const allMaps = cdnMaps.length > 0 ? cdnMaps : supabaseMaps;
-  console.log(`📍 Maps to process: ${allMaps.join(', ')}`);
+  let mapData: MapData[] = [];
+  let totalMapMarkers = 0;
 
-  // Download map images
-  console.log('\n📥 Downloading map images...');
-  await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
-  await fetchMapImages(allMaps);
+  if (!SKIP_MAP_FETCHES) {
+    // Fetch map data from Supabase
+    console.log('\n📥 Fetching map data from Supabase...');
+    await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
+    mapData = await fetchAllMapData();
+    if (mapData.length === 0) {
+      console.warn('⚠️  No map data returned; continuing with empty map dataset.');
+    }
 
-  // Download map tiles for ALL maps (not just discovered ones)
-  console.log('\n📥 Downloading map tiles...');
-  await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
-  await downloadMapTiles(allMaps);
+    // Save map data
+    console.log('\n💾 Saving map data...');
+    fs.writeFileSync(
+      path.join(DATA_DIR, 'maps.json'),
+      JSON.stringify(mapData, null, 2)
+    );
+    totalMapMarkers = mapData.reduce((sum, m) => sum + m.stats.totalMarkers, 0);
+    console.log(`✅ Saved map data with ${totalMapMarkers} markers across ${mapData.length} maps`);
 
-  // Calculate map extents from downloaded tiles
-  await calculateMapExtents();
+    // Get map names from Supabase markers
+    const supabaseMaps = mapData.map(m => m.map);
+    console.log(`📍 Maps from Supabase markers: ${supabaseMaps.join(', ') || '(none)'}`);
+
+    // Discover actual available maps by probing the CDN
+    // This is resilient to name changes - we check what actually exists
+    const cdnMaps = await discoverMapsFromCDN(supabaseMaps);
+    console.log(`📍 Maps found on CDN: ${cdnMaps.join(', ') || '(none)'}`);
+
+    // Use CDN-discovered maps as the source of truth (they're what we can actually download)
+    // Fall back to Supabase names if CDN discovery fails completely
+    const allMaps = cdnMaps.length > 0 ? cdnMaps : supabaseMaps;
+    console.log(`📍 Maps to process: ${allMaps.join(', ')}`);
+    if (allMaps.length === 0) {
+      console.warn('⚠️  No maps available for image/tile download. Skipping map asset fetch.');
+    }
+
+    // Download map images
+    console.log('\n📥 Downloading map images...');
+    await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
+    if (allMaps.length > 0) {
+      await fetchMapImages(allMaps);
+    }
+
+    // Download map tiles for ALL maps (not just discovered ones)
+    console.log('\n📥 Downloading map tiles...');
+    await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
+    if (allMaps.length > 0) {
+      await downloadMapTiles(allMaps);
+    }
+
+    // Calculate map extents from downloaded tiles
+    await calculateMapExtents();
+  } else {
+    console.log('\n⏭️  Skipping all map-related fetches and downloads.');
+    mapData = loadExistingMapData();
+    totalMapMarkers = mapData.reduce((sum, m) => sum + m.stats.totalMarkers, 0);
+    if (mapData.length > 0) {
+      console.log(`📍 Reusing existing map data from maps.json (${mapData.length} maps, ${totalMapMarkers} markers).`);
+    } else {
+      console.warn('⚠️  No existing maps.json found to reuse while skipping maps.');
+    }
+  }
 
   // Download and convert icons
   console.log('\n📥 Downloading and converting item icons from WebP to PNG...');
@@ -1182,11 +1620,15 @@ async function main() {
   // Create metadata file
   const metadata = {
     lastUpdated: new Date().toISOString(),
-    source: 'https://metaforge.app/arc-raiders (items, quests, maps)',
-    staticSource: 'Local static files (hideout modules & projects)',
-    version: '2.1.0',
+    source: 'https://metaforge.app/arc-raiders (items, quests, maps), https://raw.githubusercontent.com/RaidTheory/arcraiders-data/refs/heads/main/projects.json (projects), https://api.github.com/repos/RaidTheory/arcraiders-data/contents/hideout (hideout modules)',
+    staticSource: 'Local static files (projects fallback only)',
+    version: '2.2.0',
     itemCount: mappedItems.length,
     questCount: mappedQuests.length,
+    projectCount: mappedProjects.length,
+    projectSource,
+    hideoutModuleCount: mappedHideoutModules.length,
+    hideoutSource: RAIDTHEORY_HIDEOUT_CONTENTS_URL,
     mapCount: mapData.length,
     mapMarkerCount: totalMapMarkers,
     maps: mapData.map(m => ({
@@ -1205,9 +1647,13 @@ async function main() {
   console.log(`📊 Last updated: ${metadata.lastUpdated}`);
   console.log(`📦 Total items: ${metadata.itemCount}`);
   console.log(`🎯 Total quests: ${metadata.questCount}`);
+  console.log(`🏗️  Total projects: ${metadata.projectCount}`);
+  console.log(`📌 Project source: ${metadata.projectSource}`);
+  console.log(`🛠️  Total hideout modules: ${metadata.hideoutModuleCount}`);
+  console.log(`📌 Hideout source: ${metadata.hideoutSource}`);
   console.log(`🗺️  Total maps: ${metadata.mapCount}`);
   console.log(`📍 Total map markers: ${metadata.mapMarkerCount}`);
-  console.log(`\n⚠️  Note: Hideout modules and projects are stored in public/data/static/ and are not updated by this script.`);
+  console.log(`\nℹ️  Note: Hideout modules and projects are fetched from RaidTheory. Projects retain a local static fallback.`);
 
   // Force exit - Sharp's thread pool can keep Node alive
   process.exit(0);

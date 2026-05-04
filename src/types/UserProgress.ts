@@ -1,9 +1,12 @@
 import { UserHideoutProgress } from './HideoutModule';
 
+export type ProjectPhaseProgress = Record<string, number>;
+
 export interface UserProgress {
   hideoutLevels: UserHideoutProgress;
   completedQuests: string[];
   completedProjects: string[];
+  projectPhaseProgress: ProjectPhaseProgress;
   lastUpdated: number; // timestamp
 }
 
@@ -20,6 +23,7 @@ export const DEFAULT_USER_PROGRESS: UserProgress = {
   },
   completedQuests: [],
   completedProjects: [],
+  projectPhaseProgress: {},
   lastUpdated: Date.now()
 };
 

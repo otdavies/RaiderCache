@@ -251,13 +251,13 @@ body {
   display: grid;
   grid-template-rows: 1fr;
   transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   padding: var(--spacing-md);
   opacity: 1;
 }
 
-.collapsible-content > * {
+.collapsible-content>* {
   overflow: hidden;
 }
 
@@ -609,7 +609,7 @@ body {
 .sidebar {
   position: sticky;
   top: 80px;
-  width: 265px;
+  width: 290px;
   flex-shrink: 0;
   background: var(--color-bg-card);
   border-radius: var(--radius-md);
@@ -948,6 +948,89 @@ body {
   border-color: var(--color-accent-cyan);
 }
 
+/* Project Tracker */
+.project-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.project-card {
+  background: rgba(10, 14, 26, 0.6);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-bg-elevated);
+  transition: all var(--transition-base);
+}
+
+.project-card:hover {
+  border-color: var(--color-accent-cyan);
+  background: rgba(10, 14, 26, 0.8);
+  transform: translateX(2px);
+}
+
+.project-card h3 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.project-card__level {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.project-card__level-text {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.project-card__ticks {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  margin-top: var(--spacing-sm);
+}
+
+.project-card__tick {
+  flex: 1;
+  height: 14px;
+  min-width: 0;
+  border-radius: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.project-card__tick:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.project-card__tick:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.project-card__tick:only-child {
+  border-radius: 6px;
+}
+
+.project-card__tick:hover {
+  transform: scaleY(1.15);
+  border-color: var(--color-accent-cyan);
+  background: rgba(0, 188, 212, 0.2);
+}
+
+.project-card__tick.completed {
+  background: var(--color-accent-cyan);
+  border-color: var(--color-accent-cyan);
+}
+
 /* Quest Popover */
 .quest-popover {
   position: fixed;
@@ -1183,9 +1266,9 @@ body {
 .item-card.rarity-common {
   border-color: rgba(158, 158, 158, 0.4);
   background: linear-gradient(135deg,
-    rgba(158, 158, 158, 0.15) 0%,
-    rgba(158, 158, 158, 0.05) 50%,
-    var(--color-bg-dark) 100%) !important;
+      rgba(158, 158, 158, 0.15) 0%,
+      rgba(158, 158, 158, 0.05) 50%,
+      var(--color-bg-dark) 100%) !important;
 }
 
 .item-card.rarity-common .item-card__rarity-badge {
@@ -1195,9 +1278,9 @@ body {
 .item-card.rarity-uncommon {
   border-color: rgba(76, 175, 80, 0.5);
   background: linear-gradient(135deg,
-    rgba(76, 175, 80, 0.18) 0%,
-    rgba(76, 175, 80, 0.06) 50%,
-    var(--color-bg-dark) 100%) !important;
+      rgba(76, 175, 80, 0.18) 0%,
+      rgba(76, 175, 80, 0.06) 50%,
+      var(--color-bg-dark) 100%) !important;
 }
 
 .item-card.rarity-uncommon .item-card__rarity-badge {
@@ -1207,9 +1290,9 @@ body {
 .item-card.rarity-rare {
   border-color: rgba(33, 150, 243, 0.5);
   background: linear-gradient(135deg,
-    rgba(33, 150, 243, 0.18) 0%,
-    rgba(33, 150, 243, 0.06) 50%,
-    var(--color-bg-dark) 100%) !important;
+      rgba(33, 150, 243, 0.18) 0%,
+      rgba(33, 150, 243, 0.06) 50%,
+      var(--color-bg-dark) 100%) !important;
 }
 
 .item-card.rarity-rare .item-card__rarity-badge {
@@ -1219,9 +1302,9 @@ body {
 .item-card.rarity-epic {
   border-color: rgba(156, 39, 176, 0.5);
   background: linear-gradient(135deg,
-    rgba(156, 39, 176, 0.18) 0%,
-    rgba(156, 39, 176, 0.06) 50%,
-    var(--color-bg-dark) 100%) !important;
+      rgba(156, 39, 176, 0.18) 0%,
+      rgba(156, 39, 176, 0.06) 50%,
+      var(--color-bg-dark) 100%) !important;
 }
 
 .item-card.rarity-epic .item-card__rarity-badge {
@@ -1231,9 +1314,9 @@ body {
 .item-card.rarity-legendary {
   border-color: rgba(255, 152, 0, 0.6);
   background: linear-gradient(135deg,
-    rgba(255, 152, 0, 0.2) 0%,
-    rgba(255, 152, 0, 0.08) 50%,
-    var(--color-bg-dark) 100%) !important;
+      rgba(255, 152, 0, 0.2) 0%,
+      rgba(255, 152, 0, 0.08) 50%,
+      var(--color-bg-dark) 100%) !important;
 }
 
 .item-card.rarity-legendary .item-card__rarity-badge {
@@ -1301,32 +1384,32 @@ body {
 
 .item-card.rarity-common .item-card__image-container {
   background: linear-gradient(135deg,
-    rgba(158, 158, 158, 0.12) 0%,
-    var(--color-bg-dark) 100%);
+      rgba(158, 158, 158, 0.12) 0%,
+      var(--color-bg-dark) 100%);
 }
 
 .item-card.rarity-uncommon .item-card__image-container {
   background: linear-gradient(135deg,
-    rgba(76, 175, 80, 0.15) 0%,
-    var(--color-bg-dark) 100%);
+      rgba(76, 175, 80, 0.15) 0%,
+      var(--color-bg-dark) 100%);
 }
 
 .item-card.rarity-rare .item-card__image-container {
   background: linear-gradient(135deg,
-    rgba(33, 150, 243, 0.15) 0%,
-    var(--color-bg-dark) 100%);
+      rgba(33, 150, 243, 0.15) 0%,
+      var(--color-bg-dark) 100%);
 }
 
 .item-card.rarity-epic .item-card__image-container {
   background: linear-gradient(135deg,
-    rgba(156, 39, 176, 0.15) 0%,
-    var(--color-bg-dark) 100%);
+      rgba(156, 39, 176, 0.15) 0%,
+      var(--color-bg-dark) 100%);
 }
 
 .item-card.rarity-legendary .item-card__image-container {
   background: linear-gradient(135deg,
-    rgba(255, 152, 0, 0.18) 0%,
-    var(--color-bg-dark) 100%);
+      rgba(255, 152, 0, 0.18) 0%,
+      var(--color-bg-dark) 100%);
 }
 
 .item-card__image {
@@ -1542,9 +1625,12 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.6;
   }
+
   50% {
     opacity: 1;
   }
@@ -1644,11 +1730,30 @@ body {
   text-transform: uppercase;
 }
 
-.rarity-badge--common { background: var(--color-common); color: var(--color-bg-dark); }
-.rarity-badge--uncommon { background: var(--color-uncommon); color: var(--color-bg-dark); }
-.rarity-badge--rare { background: var(--color-rare); color: white; }
-.rarity-badge--epic { background: var(--color-epic); color: white; }
-.rarity-badge--legendary { background: var(--color-legendary); color: var(--color-bg-dark); }
+.rarity-badge--common {
+  background: var(--color-common);
+  color: var(--color-bg-dark);
+}
+
+.rarity-badge--uncommon {
+  background: var(--color-uncommon);
+  color: var(--color-bg-dark);
+}
+
+.rarity-badge--rare {
+  background: var(--color-rare);
+  color: white;
+}
+
+.rarity-badge--epic {
+  background: var(--color-epic);
+  color: white;
+}
+
+.rarity-badge--legendary {
+  background: var(--color-legendary);
+  color: var(--color-bg-dark);
+}
 
 .item-modal__section {
   margin-bottom: var(--spacing-xl);
@@ -1690,9 +1795,17 @@ body {
   text-transform: uppercase;
 }
 
-.decision-analysis__decision.decision-keep { color: var(--color-keep); }
-.decision-analysis__decision.decision-sell_or_recycle { color: var(--color-sell-or-recycle); }
-.decision-analysis__decision.decision-situational { color: var(--color-situational); }
+.decision-analysis__decision.decision-keep {
+  color: var(--color-keep);
+}
+
+.decision-analysis__decision.decision-sell_or_recycle {
+  color: var(--color-sell-or-recycle);
+}
+
+.decision-analysis__decision.decision-situational {
+  color: var(--color-situational);
+}
 
 .decision-analysis__reasons {
   list-style: none;
@@ -1960,6 +2073,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1970,6 +2084,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1981,6 +2096,7 @@ body {
     opacity: 0;
     transform: translateY(40px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -2546,6 +2662,7 @@ body {
 }
 
 @media (max-width: 768px) {
+
   /* Hide desktop controls, show mobile menu */
   .header-sort,
   .view-toggle,
@@ -2812,11 +2929,9 @@ body {
 }
 
 .zone-badge {
-  background: linear-gradient(
-    135deg,
-    var(--zone-color) 0%,
-    color-mix(in srgb, var(--zone-color) 70%, black) 100%
-  );
+  background: linear-gradient(135deg,
+      var(--zone-color) 0%,
+      color-mix(in srgb, var(--zone-color) 70%, black) 100%);
   color: white;
   padding: var(--spacing-sm) var(--spacing-lg);
   border-radius: var(--radius-md);

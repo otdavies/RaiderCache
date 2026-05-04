@@ -137,7 +137,7 @@ export class DecisionEngine {
     if (projectUse.isUsed) {
       return this.finalizeDecision(item, {
         decision: 'keep',
-        reasons: [`Needed for project: ${projectUse.projectNames.join(', ')}`],
+        reasons: projectUse.phaseRequirements.map(req => `Needed for project: ${req}`),
         dependencies: projectUse.projectNames
       });
     }
@@ -258,44 +258,52 @@ export class DecisionEngine {
   private isUsedInActiveProjects(
     item: Item,
     userProgress: UserProgress
-  ): { isUsed: boolean; projectNames: string[] } {
+  ): { isUsed: boolean; projectNames: string[]; phaseRequirements: string[] } {
     const projectNames: string[] = [];
+    const phaseRequirements: string[] = [];
 
     for (const project of this.projects) {
-      // Skip completed projects
-      if (userProgress.completedProjects.includes(project.id)) {
-        continue;
+      const completedPhase = userProgress.projectPhaseProgress?.[project.id]
+        ?? (userProgress.completedProjects.includes(project.id) ? Number.MAX_SAFE_INTEGER : 0);
+
+      let requiredInProject = false;
+
+      // Legacy requirements are treated as phase 1.
+      if (completedPhase < 1 && project.requirements && project.requirements.length > 0) {
+        const isRequired = project.requirements.some(req => req.item_id === item.id);
+        if (isRequired) {
+          requiredInProject = true;
+          phaseRequirements.push(`${project.name} (Phase 1)`);
+        }
       }
 
-      let isRequired = false;
-
-      // Check legacy requirements format
-      if (project.requirements && project.requirements.length > 0) {
-        isRequired = project.requirements.some(
-          req => req.item_id === item.id
-        );
-      }
-
-      // Check phases format (actual data structure)
-      if (!isRequired && project.phases && project.phases.length > 0) {
+      if (project.phases && project.phases.length > 0) {
         for (const phase of project.phases) {
-          if (phase.requirementItemIds && phase.requirementItemIds.length > 0) {
-            if (phase.requirementItemIds.some(req => req.item_id === item.id)) {
-              isRequired = true;
-              break;
-            }
+          const phaseNumber = Number(phase.phase) || 1;
+          if (phaseNumber <= completedPhase) {
+            continue;
+          }
+
+          const requirements = phase.requirementItemIds || [];
+          if (requirements.some(req => req.item_id === item.id)) {
+            requiredInProject = true;
+            const phaseLabel = phase.name
+              ? `${project.name} (Phase ${phaseNumber}: ${phase.name})`
+              : `${project.name} (Phase ${phaseNumber})`;
+            phaseRequirements.push(phaseLabel);
           }
         }
       }
 
-      if (isRequired) {
+      if (requiredInProject) {
         projectNames.push(project.name);
       }
     }
 
     return {
-      isUsed: projectNames.length > 0,
-      projectNames
+      isUsed: phaseRequirements.length > 0,
+      projectNames,
+      phaseRequirements
     };
   }
 

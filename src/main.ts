@@ -5,6 +5,7 @@ import { SearchEngine, type SearchableItem } from './utils/searchEngine';
 import { StorageManager } from './utils/storage';
 import type { UserProgress } from './types/UserProgress';
 import type { Item, RecycleDecision } from './types/Item';
+import type { Project } from './types/Project';
 import { ItemCard } from './components/ItemCard';
 import { ItemModal } from './components/ItemModal';
 import { ZoneFilter } from './components/ZoneFilter';
@@ -43,6 +44,9 @@ class App {
 
       // Load game data
       this.gameData = await dataLoader.loadGameData();
+
+      // Migrate legacy project completion into phase-based progress once project data is loaded.
+      this.migrateProjectPhaseProgress();
 
       // Initialize decision engine
       this.decisionEngine = new DecisionEngine(
@@ -127,6 +131,9 @@ class App {
 
     // Initialize quest tracker
     this.initializeQuestTracker();
+
+    // Initialize project tracker
+    this.initializeProjectTracker();
 
     // Initialize mobile menu
     this.initializeMobileMenu();
@@ -763,6 +770,220 @@ class App {
     }
   }
 
+  private getProjectMaxPhase(project: Project): number {
+    if (project.phases && project.phases.length > 0) {
+      const maxFromPhases = Math.max(...project.phases.map(p => Number(p.phase) || 0));
+      return Math.max(1, maxFromPhases);
+    }
+
+    if (project.requirements && project.requirements.length > 0) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  private getProjectPhasesForUI(project: Project): Array<{ phase: number; name?: string; requirementItemIds?: Array<{ item_id: string; quantity: number }> }> {
+    if (project.phases && project.phases.length > 0) {
+      return [...project.phases]
+        .map(phase => ({
+          phase: Number(phase.phase) || 1,
+          name: phase.name,
+          requirementItemIds: phase.requirementItemIds || []
+        }))
+        .sort((a, b) => a.phase - b.phase);
+    }
+
+    if (project.requirements && project.requirements.length > 0) {
+      return [{
+        phase: 1,
+        name: 'Requirements',
+        requirementItemIds: project.requirements
+      }];
+    }
+
+    return [];
+  }
+
+  private migrateProjectPhaseProgress() {
+    let changed = false;
+
+    for (const project of this.gameData.projects) {
+      const maxPhase = this.getProjectMaxPhase(project);
+      if (maxPhase <= 0) {
+        continue;
+      }
+
+      const current = this.userProgress.projectPhaseProgress[project.id] || 0;
+      if (this.userProgress.completedProjects.includes(project.id) && current < maxPhase) {
+        this.userProgress.projectPhaseProgress[project.id] = maxPhase;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      StorageManager.saveUserProgress(this.userProgress);
+    }
+  }
+
+  private initializeProjectTracker() {
+    const projectTracker = document.getElementById('project-tracker');
+    if (!projectTracker) return;
+
+    const projects = [...this.gameData.projects].sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const project of projects) {
+      const phases = this.getProjectPhasesForUI(project);
+      const maxPhase = Math.max(1, this.getProjectMaxPhase(project));
+      const rawPhase = this.userProgress.projectPhaseProgress[project.id] || 0;
+      const currentPhase = Math.min(maxPhase, Math.max(0, rawPhase));
+
+      const card = document.createElement('div');
+      card.className = 'project-card';
+
+      const phaseText = currentPhase >= maxPhase
+        ? `Phase ${currentPhase} / ${maxPhase} (Complete)`
+        : `Phase ${currentPhase} / ${maxPhase}`;
+
+      card.innerHTML = `
+        <h3>${project.name}</h3>
+        <div class="project-card__level">
+          <span class="project-card__level-text">${phaseText}</span>
+          <div class="project-card__ticks"></div>
+        </div>
+      `;
+
+      const levelText = card.querySelector('.project-card__level-text') as HTMLSpanElement;
+      const ticksContainer = card.querySelector('.project-card__ticks') as HTMLDivElement;
+
+      const updateProgress = (newPhase: number) => {
+        const normalized = Math.max(0, Math.min(maxPhase, newPhase));
+        const nextText = normalized >= maxPhase
+          ? `Phase ${normalized} / ${maxPhase} (Complete)`
+          : `Phase ${normalized} / ${maxPhase}`;
+        levelText.textContent = nextText;
+
+        ticksContainer.querySelectorAll('.project-card__tick').forEach((tick, idx) => {
+          tick.classList.toggle('completed', idx < normalized);
+        });
+
+        this.updateProjectProgress(project.id, normalized, maxPhase);
+      };
+
+      for (let phase = 1; phase <= maxPhase; phase++) {
+        const tick = document.createElement('div');
+        tick.className = 'project-card__tick';
+        if (phase <= currentPhase) {
+          tick.classList.add('completed');
+        }
+
+        const phaseData = phases.find(p => p.phase === phase);
+        tick.addEventListener('mouseenter', (e) => this.showProjectPopover(project, phase, phaseData, e));
+        tick.addEventListener('mouseleave', () => this.hideProjectPopover());
+
+        tick.addEventListener('click', () => {
+          const currentlyCompleted = tick.classList.contains('completed');
+          const newValue = currentlyCompleted ? phase - 1 : phase;
+          updateProgress(newValue);
+        });
+
+        ticksContainer.appendChild(tick);
+      }
+
+      projectTracker.appendChild(card);
+    }
+
+    if (projects.length === 0) {
+      projectTracker.innerHTML = `
+        <div class="quest-tracker__empty">
+          <p>No project data available</p>
+          <p class="quest-tracker__empty-hint">Project data will appear here once loaded</p>
+        </div>
+      `;
+    }
+  }
+
+  private showProjectPopover(project: Project, phase: number, phaseData: any, event: MouseEvent) {
+    this.hideProjectPopover();
+
+    const popover = document.createElement('div');
+    popover.className = 'quest-popover';
+    popover.id = 'project-popover';
+
+    let requirementsHtml = '<span class="quest-popover__none">None</span>';
+    if (phaseData?.requirementItemIds && phaseData.requirementItemIds.length > 0) {
+      requirementsHtml = phaseData.requirementItemIds.map((req: any) => {
+        const itemId = req.item_id || req.itemId;
+        const quantity = req.quantity || '?';
+        const item = this.gameData.items.find(i => i.id === itemId);
+        const itemName = item?.name || itemId || 'Unknown';
+        const iconUrl = item ? dataLoader.getIconUrl(item) : '';
+
+        return `
+          <div class="quest-popover__item">
+            ${iconUrl ? `<img src="${iconUrl}" alt="" class="quest-popover__item-icon" />` : ''}
+            <span>${quantity}x ${itemName}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    popover.innerHTML = `
+      <div class="quest-popover__title">${project.name} - Phase ${phase}</div>
+      ${phaseData?.name ? `<div class="quest-popover__desc">${phaseData.name}</div>` : ''}
+      <div class="quest-popover__section">
+        <div class="quest-popover__section-title">Requirements</div>
+        <div class="quest-popover__items">${requirementsHtml}</div>
+      </div>
+    `;
+
+    document.body.appendChild(popover);
+
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+
+    let left = rect.left + rect.width / 2 - popoverRect.width / 2;
+    let top = rect.top - popoverRect.height - 8;
+
+    if (left < 8) left = 8;
+    if (left + popoverRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - popoverRect.width - 8;
+    }
+    if (top < 8) {
+      top = rect.bottom + 8;
+    }
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  private hideProjectPopover() {
+    const existing = document.getElementById('project-popover');
+    if (existing) {
+      existing.remove();
+    }
+  }
+
+  private updateProjectProgress(projectId: string, phase: number, maxPhase: number) {
+    this.userProgress.projectPhaseProgress[projectId] = phase;
+
+    if (phase >= maxPhase) {
+      if (!this.userProgress.completedProjects.includes(projectId)) {
+        this.userProgress.completedProjects.push(projectId);
+      }
+    } else {
+      this.userProgress.completedProjects = this.userProgress.completedProjects.filter(id => id !== projectId);
+    }
+
+    StorageManager.updateProjectPhaseProgress(projectId, phase, maxPhase);
+
+    this.allItems = this.decisionEngine.getItemsWithDecisions(this.userProgress);
+    this.searchEngine.updateIndex(this.allItems);
+
+    this.applyFilters();
+    this.updateStats();
+  }
+
   private showQuestPopover(quest: any, event: MouseEvent) {
     // Remove existing popover if any
     this.hideQuestPopover();
@@ -1038,7 +1259,7 @@ class App {
       item,
       decisionData: itemWithDecision.decisionData,
       decisionEngine: this.decisionEngine,
-      onClose: () => {}
+      onClose: () => { }
     });
 
     modal.show();

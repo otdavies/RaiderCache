@@ -1,6 +1,8 @@
 import type { UserProgress } from '../types/UserProgress';
 import { DEFAULT_USER_PROGRESS } from '../types/UserProgress';
 
+const LEGACY_COMPLETED_PHASE_VALUE = Number.MAX_SAFE_INTEGER;
+
 const STORAGE_KEYS = {
   USER_PROGRESS: 'arc_raiders_user_progress',
   FAVORITES: 'arc_raiders_favorites',
@@ -18,16 +20,29 @@ export class StorageManager {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.USER_PROGRESS);
       if (stored) {
-        const progress = JSON.parse(stored) as UserProgress;
-        // Ensure all hideout modules exist
-        const mergedProgress = {
+        const progress = JSON.parse(stored) as Partial<UserProgress>;
+
+        const mergedProgress: UserProgress = {
           ...DEFAULT_USER_PROGRESS,
           ...progress,
           hideoutLevels: {
             ...DEFAULT_USER_PROGRESS.hideoutLevels,
-            ...progress.hideoutLevels
+            ...(progress.hideoutLevels || {})
+          },
+          projectPhaseProgress: {
+            ...DEFAULT_USER_PROGRESS.projectPhaseProgress,
+            ...(progress.projectPhaseProgress || {})
           }
         };
+
+        // Migration: legacy completedProjects implies all phases complete.
+        for (const projectId of mergedProgress.completedProjects) {
+          const existing = mergedProgress.projectPhaseProgress[projectId] || 0;
+          if (existing <= 0) {
+            mergedProgress.projectPhaseProgress[projectId] = LEGACY_COMPLETED_PHASE_VALUE;
+          }
+        }
+
         return mergedProgress;
       }
     } catch (error) {
@@ -76,8 +91,32 @@ export class StorageManager {
     const progress = this.loadUserProgress();
     if (!progress.completedProjects.includes(projectId)) {
       progress.completedProjects.push(projectId);
-      this.saveUserProgress(progress);
     }
+    progress.projectPhaseProgress[projectId] = LEGACY_COMPLETED_PHASE_VALUE;
+    this.saveUserProgress(progress);
+  }
+
+  /**
+   * Set completed phase for a project
+   */
+  static updateProjectPhaseProgress(projectId: string, phase: number, maxPhase?: number): void {
+    const progress = this.loadUserProgress();
+    const normalizedPhase = Math.max(0, Math.floor(phase));
+    progress.projectPhaseProgress[projectId] = normalizedPhase;
+
+    // Keep legacy completedProjects aligned for backwards compatibility.
+    if (typeof maxPhase === 'number' && maxPhase > 0) {
+      const isFullyComplete = normalizedPhase >= maxPhase;
+      if (isFullyComplete) {
+        if (!progress.completedProjects.includes(projectId)) {
+          progress.completedProjects.push(projectId);
+        }
+      } else {
+        progress.completedProjects = progress.completedProjects.filter(id => id !== projectId);
+      }
+    }
+
+    this.saveUserProgress(progress);
   }
 
   /**
