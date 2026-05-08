@@ -1448,52 +1448,53 @@ class App {
 
   private applyFilters() {
     let items = [...this.allItems];
+    const searchQuery = this.filters.searchQuery.trim();
 
-    // Search filter
-    if (this.filters.searchQuery.trim()) {
-      items = this.searchEngine.search(this.filters.searchQuery);
-    }
-
-    // Decision filter
-    if (this.filters.decisions.size > 0) {
-      items = items.filter(item =>
-        this.filters.decisions.has(item.decisionData.decision)
-      );
-    }
-
-    // Rarity filter
-    if (this.filters.rarities.size > 0) {
-      items = items.filter(item =>
-        item.rarity && this.filters.rarities.has(item.rarity.toLowerCase())
-      );
-    }
-
-    // Category filter (three-state: include takes priority over exclude)
-    // Uses normalized categories for case-insensitive and fuzzy matching
-    if (this.filters.categories.size > 0) {
-      const included = [...this.filters.categories.entries()]
-        .filter(([_, state]) => state === 'include')
-        .map(([cat]) => cat);
-      const excluded = [...this.filters.categories.entries()]
-        .filter(([_, state]) => state === 'exclude')
-        .map(([cat]) => cat);
-
-      if (included.length > 0) {
-        // Include mode: show ONLY included categories
-        items = items.filter(item => included.includes(this.getItemCategory(item)));
-      } else if (excluded.length > 0) {
-        // Exclude mode: hide excluded categories
-        items = items.filter(item => !excluded.includes(this.getItemCategory(item)));
+    if (searchQuery) {
+      // Search overrides all other filters so users can find any matching item quickly.
+      items = this.searchEngine.search(searchQuery);
+    } else {
+      // Decision filter
+      if (this.filters.decisions.size > 0) {
+        items = items.filter(item =>
+          this.filters.decisions.has(item.decisionData.decision)
+        );
       }
-    }
 
-    // Zone filter
-    if (this.filters.zones.length > 0) {
-      items = items.filter(item => {
-        if (!item.foundIn || item.foundIn.length === 0) return false;
-        // Item must be found in at least one of the selected zones
-        return item.foundIn.some(zone => this.filters.zones.includes(zone));
-      });
+      // Rarity filter
+      if (this.filters.rarities.size > 0) {
+        items = items.filter(item =>
+          item.rarity && this.filters.rarities.has(item.rarity.toLowerCase())
+        );
+      }
+
+      // Category filter (three-state: include takes priority over exclude)
+      // Uses normalized categories for case-insensitive and fuzzy matching
+      if (this.filters.categories.size > 0) {
+        const included = [...this.filters.categories.entries()]
+          .filter(([_, state]) => state === 'include')
+          .map(([cat]) => cat);
+        const excluded = [...this.filters.categories.entries()]
+          .filter(([_, state]) => state === 'exclude')
+          .map(([cat]) => cat);
+
+        if (included.length > 0) {
+          // Include mode: show ONLY included categories
+          items = items.filter(item => included.includes(this.getItemCategory(item)));
+        } else if (excluded.length > 0) {
+          // Exclude mode: hide excluded categories
+          items = items.filter(item => !excluded.includes(this.getItemCategory(item)));
+        }
+      }
+
+      // Zone filter
+      if (this.filters.zones.length > 0) {
+        items = items.filter(item => {
+          if (!item.foundIn || item.foundIn.length === 0) return false;
+          // Item must be found in at least one of the selected zones
+          return item.foundIn.some(zone => this.filters.zones.includes(zone));
+        });
+      }
     }
 
     // Sort items
