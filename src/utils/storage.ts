@@ -6,6 +6,7 @@ const LEGACY_COMPLETED_PHASE_VALUE = Number.MAX_SAFE_INTEGER;
 const STORAGE_KEYS = {
   USER_PROGRESS: 'arc_raiders_user_progress',
   FAVORITES: 'arc_raiders_favorites',
+  DECISION_FILTERS: 'arc_raiders_decision_filters',
   CATEGORY_FILTERS: 'arc_raiders_category_filters',
   PVP_GATE: 'arc_raiders_pvp_gate',
   VIEW_MODE: 'arc_raiders_view_mode',
@@ -15,6 +16,7 @@ const STORAGE_KEYS = {
 
 export type CategoryFilterState = Record<string, 'include' | 'exclude'>;
 export type ViewMode = 'grid' | 'list' | 'compact';
+type DecisionFilter = 'keep' | 'sell_or_recycle' | 'situational';
 
 export class StorageManager {
   /**
@@ -171,6 +173,43 @@ export class StorageManager {
     }
     this.saveFavorites(favorites);
     return favorites.has(itemId);
+  }
+
+  /**
+   * Load decision filters from localStorage
+   */
+  static loadDecisionFilters(): Set<DecisionFilter> {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.DECISION_FILTERS);
+      if (stored) {
+        const parsed = JSON.parse(stored) as unknown;
+        if (Array.isArray(parsed)) {
+          return new Set(
+            parsed.filter(
+              (entry): entry is DecisionFilter =>
+                entry === 'keep' || entry === 'sell_or_recycle' || entry === 'situational'
+            )
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load decision filters:', error);
+    }
+    return new Set();
+  }
+
+  /**
+   * Save decision filters to localStorage
+   */
+  static saveDecisionFilters(filters: Set<DecisionFilter>): void {
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.DECISION_FILTERS,
+        JSON.stringify(Array.from(filters))
+      );
+    } catch (error) {
+      console.error('Failed to save decision filters:', error);
+    }
   }
 
   /**

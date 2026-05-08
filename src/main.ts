@@ -159,6 +159,8 @@ class App {
     const filterContainer = document.getElementById('decision-filter');
     if (!filterContainer) return;
 
+    this.filters.decisions = StorageManager.loadDecisionFilters();
+
     const decisions: RecycleDecision[] = ['keep', 'sell_or_recycle', 'situational'];
     const labels: Record<RecycleDecision, string> = {
       keep: 'Keep',
@@ -171,6 +173,7 @@ class App {
       button.className = 'filter-btn';
       button.dataset.decision = decision;
       button.textContent = labels[decision];
+      button.classList.toggle('active', this.filters.decisions.has(decision));
 
       button.addEventListener('click', () => {
         if (this.filters.decisions.has(decision)) {
@@ -180,6 +183,7 @@ class App {
           this.filters.decisions.add(decision);
           button.classList.add('active');
         }
+        StorageManager.saveDecisionFilters(this.filters.decisions);
         this.applyFilters();
       });
 
