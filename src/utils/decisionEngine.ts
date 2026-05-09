@@ -177,7 +177,18 @@ export class DecisionEngine {
       });
     }
 
-    // Priority 12: Items that recycle into valuable materials (SELL OR RECYCLE)
+    // Priority 12: Snitch Scanner - SITUATIONAL (Call Arc can quickly farm quest points)
+    if (item.id === 'snitch-scanner') {
+      return this.finalizeDecision(item, {
+        decision: 'situational',
+        reasons: [
+          'Call Arc can be used to quickly farm quest points',
+          'Keep if you are actively progressing point-based quests'
+        ]
+      });
+    }
+
+    // Priority 13: Items that recycle into valuable materials (SELL OR RECYCLE)
     const recycleData = item.recyclesInto || item.salvagesInto || item.crafting;
     if (recycleData && Object.keys(recycleData).length > 0) {
       const recycleValue = this.evaluateRecycleValue(item);
@@ -192,7 +203,7 @@ export class DecisionEngine {
       }
     }
 
-    // Priority 13: Rare/Epic items (SITUATIONAL - player decision)
+    // Priority 14: Rare/Epic items (SITUATIONAL - player decision)
     if (item.rarity && ['rare', 'epic'].includes(item.rarity.toLowerCase())) {
       return this.finalizeDecision(item, {
         decision: 'situational',
