@@ -1,4 +1,4 @@
-import type { Item, DecisionReason } from '../types/Item';
+import type { Item, DecisionReason, DecisionDependencyDetail } from '../types/Item';
 import type { UserProgress } from '../types/UserProgress';
 import type { HideoutModule } from '../types/HideoutModule';
 import type { Quest } from '../types/Quest';
@@ -127,8 +127,12 @@ export class DecisionEngine {
     if (questUse.isUsed) {
       return this.finalizeDecision(item, {
         decision: 'keep',
-        reasons: [`Required for quest: ${questUse.questNames.join(', ')}`],
-        dependencies: questUse.questNames
+        reasons: [
+          `Required for quest: ${questUse.questNames.join(', ')}`,
+          `Total required for active quests: ${questUse.totalRequired}`
+        ],
+        dependencies: questUse.questNames,
+        dependencyDetails: questUse.details
       });
     }
 
@@ -137,8 +141,13 @@ export class DecisionEngine {
     if (projectUse.isUsed) {
       return this.finalizeDecision(item, {
         decision: 'keep',
-        reasons: projectUse.phaseRequirements.map(req => `Needed for project: ${req}`),
-        dependencies: projectUse.projectNames
+        reasons: [
+          `Needed for project: ${projectUse.projectNames.join(', ')}`,
+          `Total required for active projects: ${projectUse.totalRequired}`,
+          ...projectUse.phaseRequirements.map(req => `Phase requirement: ${req}`)
+        ],
+        dependencies: projectUse.projectNames,
+        dependencyDetails: projectUse.details
       });
     }
 
@@ -227,8 +236,10 @@ export class DecisionEngine {
   private isUsedInActiveQuests(
     item: Item,
     userProgress: UserProgress
-  ): { isUsed: boolean; questNames: string[] } {
+  ): { isUsed: boolean; questNames: string[]; totalRequired: number; details: DecisionDependencyDetail[] } {
     const questNames: string[] = [];
+    let totalRequired = 0;
+    const details: DecisionDependencyDetail[] = [];
 
     for (const quest of this.quests) {
       // Skip completed quests
@@ -236,30 +247,45 @@ export class DecisionEngine {
         continue;
       }
 
-      // Check if item is in quest requirements
-      let isRequired = false;
+      let requiredQuantity = 0;
 
       if (quest.requirements && quest.requirements.length > 0) {
-        isRequired = quest.requirements.some(
-          req => req.item_id === item.id
-        );
+        for (const req of quest.requirements) {
+          if (req.item_id === item.id) {
+            requiredQuantity += Number(req.quantity) || 1;
+          }
+        }
       }
 
       // Also check rewardItemIds (the actual data structure uses this)
-      if (!isRequired && quest.rewardItemIds && quest.rewardItemIds.length > 0) {
-        isRequired = quest.rewardItemIds.some(
-          reward => reward.item_id === item.id
-        );
+      if (quest.rewardItemIds && quest.rewardItemIds.length > 0) {
+        for (const reward of quest.rewardItemIds) {
+          if (reward.item_id === item.id) {
+            requiredQuantity += Number(reward.quantity) || 1;
+          }
+        }
       }
 
-      if (isRequired) {
+      if (requiredQuantity > 0) {
         questNames.push(quest.name);
+        totalRequired += requiredQuantity;
+        details.push({
+          kind: 'quest',
+          id: quest.id,
+          name: quest.name,
+          totalRequired: requiredQuantity,
+          trader: quest.trader,
+          description: quest.description,
+          objectives: Array.isArray(quest.objectives) ? quest.objectives : []
+        });
       }
     }
 
     return {
       isUsed: questNames.length > 0,
-      questNames
+      questNames,
+      totalRequired,
+      details
     };
   }
 
@@ -269,38 +295,77 @@ export class DecisionEngine {
   private isUsedInActiveProjects(
     item: Item,
     userProgress: UserProgress
-  ): { isUsed: boolean; projectNames: string[]; phaseRequirements: string[] } {
+  ): { isUsed: boolean; projectNames: string[]; phaseRequirements: string[]; totalRequired: number; details: DecisionDependencyDetail[] } {
     const projectNames: string[] = [];
     const phaseRequirements: string[] = [];
+    let totalRequired = 0;
+    const details: DecisionDependencyDetail[] = [];
 
     for (const project of this.projects) {
       const completedPhase = userProgress.projectPhaseProgress?.[project.id]
         ?? (userProgress.completedProjects.includes(project.id) ? Number.MAX_SAFE_INTEGER : 0);
 
       let requiredInProject = false;
+      let requiredQuantityInProject = 0;
+      const phaseDetails: Array<{
+        phase: number;
+        name?: string;
+        requiredQuantity: number;
+        status: 'completed' | 'requires_item' | 'open';
+      }> = [];
 
       // Legacy requirements are treated as phase 1.
-      if (completedPhase < 1 && project.requirements && project.requirements.length > 0) {
-        const isRequired = project.requirements.some(req => req.item_id === item.id);
-        if (isRequired) {
+      if (project.requirements && project.requirements.length > 0) {
+        const requiredInLegacy = project.requirements
+          .filter(req => req.item_id === item.id)
+          .reduce((sum, req) => sum + (Number(req.quantity) || 1), 0);
+
+        const legacyStatus: 'completed' | 'requires_item' | 'open' = completedPhase >= 1
+          ? 'completed'
+          : requiredInLegacy > 0
+            ? 'requires_item'
+            : 'open';
+
+        phaseDetails.push({
+          phase: 1,
+          requiredQuantity: requiredInLegacy,
+          status: legacyStatus
+        });
+
+        if (completedPhase < 1 && requiredInLegacy > 0) {
           requiredInProject = true;
-          phaseRequirements.push(`${project.name} (Phase 1)`);
+          requiredQuantityInProject += requiredInLegacy;
+          phaseRequirements.push(`${project.name} (Phase 1) x${requiredInLegacy}`);
         }
       }
 
       if (project.phases && project.phases.length > 0) {
         for (const phase of project.phases) {
           const phaseNumber = Number(phase.phase) || 1;
-          if (phaseNumber <= completedPhase) {
-            continue;
-          }
-
           const requirements = phase.requirementItemIds || [];
-          if (requirements.some(req => req.item_id === item.id)) {
+          const requiredInPhase = requirements
+            .filter(req => req.item_id === item.id)
+            .reduce((sum, req) => sum + (Number(req.quantity) || 1), 0);
+
+          const phaseStatus: 'completed' | 'requires_item' | 'open' = phaseNumber <= completedPhase
+            ? 'completed'
+            : requiredInPhase > 0
+              ? 'requires_item'
+              : 'open';
+
+          phaseDetails.push({
+            phase: phaseNumber,
+            name: phase.name,
+            requiredQuantity: requiredInPhase,
+            status: phaseStatus
+          });
+
+          if (phaseNumber > completedPhase && requiredInPhase > 0) {
             requiredInProject = true;
+            requiredQuantityInProject += requiredInPhase;
             const phaseLabel = phase.name
-              ? `${project.name} (Phase ${phaseNumber}: ${phase.name})`
-              : `${project.name} (Phase ${phaseNumber})`;
+              ? `${project.name} (Phase ${phaseNumber}: ${phase.name}) x${requiredInPhase}`
+              : `${project.name} (Phase ${phaseNumber}) x${requiredInPhase}`;
             phaseRequirements.push(phaseLabel);
           }
         }
@@ -308,13 +373,24 @@ export class DecisionEngine {
 
       if (requiredInProject) {
         projectNames.push(project.name);
+        totalRequired += requiredQuantityInProject;
+        details.push({
+          kind: 'project',
+          id: project.id,
+          name: project.name,
+          totalRequired: requiredQuantityInProject,
+          description: project.description,
+          phases: phaseDetails
+        });
       }
     }
 
     return {
       isUsed: phaseRequirements.length > 0,
       projectNames,
-      phaseRequirements
+      phaseRequirements,
+      totalRequired,
+      details
     };
   }
 

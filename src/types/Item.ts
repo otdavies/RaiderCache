@@ -51,9 +51,26 @@ export interface ItemWithDecision extends Item {
 
 export type RecycleDecision = 'keep' | 'sell_or_recycle' | 'situational';
 
+export interface DecisionDependencyDetail {
+  kind: 'quest' | 'project' | 'hideout';
+  id: string;
+  name: string;
+  totalRequired?: number;
+  trader?: string;
+  description?: string;
+  objectives?: string[];
+  phases?: Array<{
+    phase: number;
+    name?: string;
+    requiredQuantity: number;
+    status: 'completed' | 'requires_item' | 'open';
+  }>;
+}
+
 export interface DecisionReason {
   decision: RecycleDecision;
   reasons: string[];
   dependencies?: string[]; // Quest/project/upgrade names
+  dependencyDetails?: DecisionDependencyDetail[];
   recycleValueExceedsItem?: boolean; // True if recycling yields more value than item
 }

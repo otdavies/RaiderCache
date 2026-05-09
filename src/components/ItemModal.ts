@@ -1,4 +1,4 @@
-import type { Item, DecisionReason } from '../types/Item';
+import type { Item, DecisionReason, DecisionDependencyDetail } from '../types/Item';
 import { dataLoader } from '../utils/dataLoader';
 import { getMapRecommendations, getZoneInfo } from '../utils/zoneMapping';
 import type { DecisionEngine } from '../utils/decisionEngine';
@@ -16,6 +16,7 @@ export interface ItemModalConfig {
 export class ItemModal {
   private config: ItemModalConfig;
   private modalElement: HTMLElement | null = null;
+  private dependencyPopoverElement: HTMLElement | null = null;
   private static currentMapViewModal: HTMLElement | null = null;
   private static currentMapView: MapView | null = null;
 
@@ -58,6 +59,7 @@ export class ItemModal {
   }
 
   hide(): void {
+    this.hideDependencyPopover();
     if (this.modalElement) {
       this.modalElement.classList.remove('active');
       this.config.onClose();
@@ -85,6 +87,9 @@ export class ItemModal {
     // View map button
     const viewMapBtn = content.querySelector('[data-action="view-map"]');
     viewMapBtn?.addEventListener('click', () => this.openMapView());
+
+    // Hover popovers for quest/project dependencies
+    this.attachDependencyHoverHandlers(content);
   }
 
   private loadUsedToCraftAsync(content: Element): void {
@@ -167,11 +172,7 @@ export class ItemModal {
                 </span>
               </div>
               ${this.renderDecisionReasons(decisionData)}
-              ${decisionData.dependencies && decisionData.dependencies.length > 0 ? `
-                <div class="decision-analysis__dependencies">
-                  <strong>Required for:</strong> ${decisionData.dependencies.join(', ')}
-                </div>
-              ` : ''}
+              ${this.renderDecisionDependencies(decisionData)}
             </div>
           </div>
 
@@ -402,6 +403,177 @@ export class ItemModal {
     }
 
     return '';
+  }
+
+  private renderDecisionDependencies(decisionData: DecisionReason): string {
+    const details = decisionData.dependencyDetails || [];
+
+    if (details.length > 0) {
+      return `
+        <div class="decision-analysis__dependencies">
+          <strong>Required for:</strong>
+          <div class="decision-analysis__dependency-list">
+            ${details.map((detail, index) => {
+        const quantity = detail.totalRequired && detail.totalRequired > 0
+          ? ` x${detail.totalRequired}`
+          : '';
+        const badgeKind = detail.kind === 'quest' || detail.kind === 'project'
+          ? detail.kind
+          : 'other';
+        return `<span class="decision-dependency decision-dependency--${badgeKind}" data-dependency-index="${index}">${this.escapeHtml(detail.name)}${quantity}</span>`;
+      }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    if (decisionData.dependencies && decisionData.dependencies.length > 0) {
+      return `
+        <div class="decision-analysis__dependencies">
+          <strong>Required for:</strong> ${decisionData.dependencies.map(dep => this.escapeHtml(dep)).join(', ')}
+        </div>
+      `;
+    }
+
+    return '';
+  }
+
+  private attachDependencyHoverHandlers(content: Element): void {
+    const details = this.config.decisionData.dependencyDetails || [];
+    if (details.length === 0) {
+      return;
+    }
+
+    const dependencyElements = content.querySelectorAll('[data-dependency-index]');
+    dependencyElements.forEach((element) => {
+      const htmlElement = element as HTMLElement;
+      const index = Number(htmlElement.dataset.dependencyIndex);
+      if (!Number.isFinite(index) || !details[index]) {
+        return;
+      }
+
+      const detail = details[index];
+      if (detail.kind !== 'quest' && detail.kind !== 'project') {
+        return;
+      }
+
+      htmlElement.addEventListener('mouseenter', () => {
+        this.showDependencyPopover(detail, htmlElement);
+      });
+
+      htmlElement.addEventListener('mouseleave', () => {
+        this.hideDependencyPopover();
+      });
+    });
+  }
+
+  private showDependencyPopover(detail: DecisionDependencyDetail, anchor: HTMLElement): void {
+    this.hideDependencyPopover();
+
+    const popover = document.createElement('div');
+    popover.className = 'decision-dependency-popover';
+    popover.innerHTML = this.buildDependencyPopoverContent(detail);
+
+    document.body.appendChild(popover);
+    this.dependencyPopoverElement = popover;
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+    const viewportPadding = 8;
+    const gap = 8;
+
+    let left = anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2);
+    let top = anchorRect.top - popoverRect.height - gap;
+
+    if (left < viewportPadding) left = viewportPadding;
+    if (left + popoverRect.width > window.innerWidth - viewportPadding) {
+      left = window.innerWidth - popoverRect.width - viewportPadding;
+    }
+
+    // Prefer showing above the anchor, but fall back below when needed.
+    if (top < viewportPadding) {
+      top = anchorRect.bottom + gap;
+    }
+
+    // Clamp to viewport bottom/top so the popup never renders off-screen.
+    if (top + popoverRect.height > window.innerHeight - viewportPadding) {
+      top = Math.max(viewportPadding, window.innerHeight - popoverRect.height - viewportPadding);
+    }
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  private buildDependencyPopoverContent(detail: DecisionDependencyDetail): string {
+    const totalRequired = detail.totalRequired && detail.totalRequired > 0
+      ? `<div class="decision-dependency-popover__meta">Total Required: ${detail.totalRequired}</div>`
+      : '';
+
+    if (detail.kind === 'quest') {
+      const objectives = Array.isArray(detail.objectives) && detail.objectives.length > 0
+        ? detail.objectives.map(step => `<li>${this.escapeHtml(step)}</li>`).join('')
+        : '<li>No objectives listed</li>';
+      const trader = detail.trader ? `<div class="decision-dependency-popover__meta">Trader: ${this.escapeHtml(detail.trader)}</div>` : '';
+      const description = detail.description
+        ? `<div class="decision-dependency-popover__desc">${this.escapeHtml(detail.description)}</div>`
+        : '';
+
+      return `
+        <div class="decision-dependency-popover__title">Quest: ${this.escapeHtml(detail.name)}</div>
+        ${trader}
+        ${totalRequired}
+        ${description}
+        <div class="decision-dependency-popover__section-title">Steps</div>
+        <ol class="decision-dependency-popover__list">${objectives}</ol>
+      `;
+    }
+
+    if (detail.kind === 'project') {
+      const description = detail.description
+        ? `<div class="decision-dependency-popover__desc">${this.escapeHtml(detail.description)}</div>`
+        : '';
+      const phases = Array.isArray(detail.phases) && detail.phases.length > 0
+        ? detail.phases
+          .sort((a, b) => a.phase - b.phase)
+          .map((phase) => {
+            const phaseName = phase.name ? `: ${this.escapeHtml(phase.name)}` : '';
+            const quantitySuffix = phase.requiredQuantity > 0 ? `: x${phase.requiredQuantity}` : '';
+            return `<li class="decision-dependency-popover__phase decision-dependency-popover__phase--${phase.status}"><span class="decision-dependency-popover__phase-title">Phase ${phase.phase}${phaseName}${quantitySuffix}</span></li>`;
+          })
+          .join('')
+        : '<li>No phase details listed</li>';
+
+      return `
+        <div class="decision-dependency-popover__title">Project: ${this.escapeHtml(detail.name)}</div>
+        ${totalRequired}
+        ${description}
+        <div class="decision-dependency-popover__legend">
+          <span class="decision-dependency-popover__legend-item decision-dependency-popover__legend-item--completed">Completed</span>
+          <span class="decision-dependency-popover__legend-item decision-dependency-popover__legend-item--requires_item">Requires Item</span>
+          <span class="decision-dependency-popover__legend-item decision-dependency-popover__legend-item--open">Open / No Requirement</span>
+        </div>
+        <div class="decision-dependency-popover__section-title">All Phases</div>
+        <ol class="decision-dependency-popover__list">${phases}</ol>
+      `;
+    }
+
+    return `<div class="decision-dependency-popover__title">${this.escapeHtml(detail.name)}</div>${totalRequired}`;
+  }
+
+  private hideDependencyPopover(): void {
+    if (this.dependencyPopoverElement) {
+      this.dependencyPopoverElement.remove();
+      this.dependencyPopoverElement = null;
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   private renderRecyclesInto(item: Item): string {
