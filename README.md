@@ -82,6 +82,10 @@ Contributions are welcome! If you find bugs or have suggestions:
 2. Submit a pull request
 3. Report data inconsistencies
 
+## Related Resources
+
+- [ARC Raider Hub](https://arcraiderhub.xyz/) — ARC Raiders weapon tier lists, extraction routes, augment guides, and raid strategies.
+
 ## License
 
 MIT License - See [LICENSE](LICENSE) for details
